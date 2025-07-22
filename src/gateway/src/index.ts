@@ -1,13 +1,14 @@
-// API Gateway Service
-// Экспорт всех эндпоинтов
+// API Gateway Service - Main Index
+// Single entry point for all external API requests via /api/v1/*
 
-// Health checks
+// Export health and metrics endpoints
 export * from './handlers/health';
-
-// Metrics
 export * from './handlers/metrics';
 
-// Routes
-export * from '../routing/tenant-routes';
-export * from '../routing/user-routes';
-export * from '../routing/content-routes';
+// Export new unified API endpoints (replacing old routing files)
+export * from '../endpoints/user-endpoints';
+export * from '../endpoints/tenant-endpoints';
+export * from '../endpoints/content-endpoints';
+
+// Export auth handler and gateway for internal use
+export { auth, gateway } from '../auth';

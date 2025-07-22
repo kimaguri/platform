@@ -1,10 +1,11 @@
 import { Service } from 'encore.dev/service';
-import {
-  tenantValidationMiddleware,
-  performanceMiddleware,
-  cachingMiddleware,
-} from '../../shared/middleware';
 
-export default new Service('tenant-management', {
-  middlewares: [performanceMiddleware, cachingMiddleware],
-});
+/**
+ * Tenant Management Service
+ * Internal RPC service for tenant operations
+ *
+ * This service is called internally by the API Gateway
+ * All external endpoints are now handled by the Gateway
+ * No middleware needed - Gateway handles all cross-cutting concerns
+ */
+export default new Service('tenant-management');
