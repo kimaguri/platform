@@ -7,25 +7,42 @@
     "module": "ES2022",
     "types": ["node"],
     "paths": {
-      "~encore/*": ["./encore.gen/*"]
+      "~encore/*": ["./encore.gen/*"],
+      "@shared/*": ["./src/shared/*"],
+      "@config/*": ["./src/config/*"],
+      "@connectors/*": ["./src/connectors/*"],
+      "@services/*": ["./src/services/*"],
+      "@gateway/*": ["./src/gateway/*"]
     },
 
     /* Workspace Settings */
     "composite": true,
+    "baseUrl": ".",
 
     /* Strict Type-Checking Options */
     "strict": true,
+    "noImplicitAny": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
 
     /* Module Resolution Options */
     "moduleResolution": "bundler",
     "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
     "isolatedModules": true,
     "sourceMap": true,
+    "resolveJsonModule": true,
 
     "declaration": true,
+    "declarationMap": true,
+    "outDir": "./dist",
 
     /* Advanced Options */
     "forceConsistentCasingInFileNames": true,
-    "skipLibCheck": true
-  }
+    "skipLibCheck": true,
+    "incremental": true
+  },
+  "include": ["src/**/*", "encore.gen/**/*"],
+  "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.spec.ts"]
 }

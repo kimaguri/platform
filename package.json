@@ -1,12 +1,27 @@
 {
-  "name": "encore-ts-introduction",
+  "name": "simplx-platform",
   "private": true,
-  "version": "0.0.1",
-  "description": "Encore.ts Introduction",
+  "version": "1.0.0",
+  "description": "Modern Multi-Tenant Microservices Platform built on Encore.ts with centralized configuration, connector system, and unified API Gateway",
   "license": "MPL-2.0",
   "type": "module",
+  "keywords": [
+    "encore.ts",
+    "microservices",
+    "multi-tenant",
+    "supabase",
+    "typescript",
+    "api-gateway",
+    "connector-pattern"
+  ],
+  "author": "SimplX Platform Team",
   "scripts": {
-    "test": "vitest"
+    "test": "vitest",
+    "dev": "encore run",
+    "build": "encore build",
+    "deploy": "encore deploy",
+    "lint": "tsc --noEmit",
+    "type-check": "tsc --noEmit --skipLibCheck"
   },
   "devDependencies": {
     "@types/node": "^20.5.7",
@@ -17,5 +32,16 @@
     "@supabase/supabase-js": "^2.52.0",
     "dotenv": "^17.2.0",
     "encore.dev": "^1.48.10"
-  }
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/simplx/platform.git"
+  },
+  "bugs": {
+    "url": "https://github.com/simplx/platform/issues"
+  },
+  "homepage": "https://github.com/simplx/platform#readme"
 }
