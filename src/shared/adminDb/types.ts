@@ -127,6 +127,7 @@ export interface LegacyTenantConfig {
   SUPABASE_URL: string;
   ANON_KEY: string;
   SERVICE_KEY: string;
+  connector_type?: 'supabase' | 'native'; // Тип коннектора
 }
 
 export interface LegacyTenantsConfig {

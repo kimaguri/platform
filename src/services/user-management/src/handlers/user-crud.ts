@@ -27,7 +27,7 @@ async function getTenantConnectorConfig(tenantId: string) {
  * Получить список пользователей (только для админов)
  */
 export const listUsers = api(
-  { auth: true, method: 'GET', path: '/users', expose: true },
+  { auth: true, method: 'GET', path: '/users/list', expose: true },
   async ({
     limit,
     offset,

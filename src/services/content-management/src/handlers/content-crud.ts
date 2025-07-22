@@ -4,6 +4,14 @@ import { ConnectorRegistry } from '../../../../connectors/registry/connector-reg
 import { ResourceResolver } from '../../../../connectors/registry/resource-resolver';
 import { getTenantConfigById } from '../../../../shared/tenantConfig';
 import { ApiResponse } from '../../../../shared/types';
+import {
+  ListResponse,
+  EntityResponse,
+  DeleteResponse,
+  toListResponse,
+  toEntityResponse,
+  toDeleteResponse,
+} from '../../../../shared/types/supabase-response';
 import type { AuthData } from '../../../../shared/middleware/auth/auth-handler';
 import type {
   ListEntitiesRequest,
@@ -14,6 +22,16 @@ import type {
   DeleteEntityRequest,
   ContentEntity,
 } from '../models/content';
+
+// Extended interface for list entities with pagination
+interface ListEntitiesWithPaginationRequest {
+  entity: string;
+  limit?: Query<number>;
+  offset?: Query<number>;
+}
+
+// Using universal Supabase response types
+// Removed custom interfaces in favor of standardized types
 
 // Initialize connector system
 const connectorRegistry = new ConnectorRegistry();
@@ -37,13 +55,7 @@ async function getTenantConnectorConfig(tenantId: string) {
  */
 export const listEntities = api(
   { auth: true, method: 'GET', path: '/entities/:entity', expose: true },
-  async ({
-    entity,
-    limit,
-    offset,
-  }: ListEntitiesRequest & { limit?: Query<number>; offset?: Query<number> }): Promise<
-    ApiResponse<ContentEntity[]>
-  > => {
+  async ({ entity, limit, offset }: ListEntitiesWithPaginationRequest): Promise<ListResponse> => {
     try {
       const authData = getAuthData() as AuthData;
 
@@ -58,13 +70,15 @@ export const listEntities = api(
       );
 
       return {
-        data: entities,
+        count: entities.length,
         message: 'Entities retrieved successfully',
+        success: true,
       };
     } catch (error) {
       return {
-        error: error instanceof Error ? error.message : 'Failed to fetch entities',
-        message: 'Failed to fetch entities',
+        count: 0,
+        message: error instanceof Error ? error.message : 'Failed to fetch entities',
+        success: false,
       };
     }
   }
@@ -75,7 +89,7 @@ export const listEntities = api(
  */
 export const getEntity = api(
   { auth: true, method: 'GET', path: '/entities/:entity/:id', expose: true },
-  async ({ entity, id }: GetEntityRequest): Promise<ApiResponse<ContentEntity>> => {
+  async ({ entity, id }: GetEntityRequest): Promise<EntityResponse> => {
     try {
       const authData = getAuthData() as AuthData;
 
@@ -91,19 +105,22 @@ export const getEntity = api(
 
       if (!entities || entities.length === 0) {
         return {
-          error: 'Entity not found',
+          entityId: undefined,
           message: 'Entity not found',
+          success: false,
         };
       }
 
       return {
-        data: entities[0],
+        entityId: entities[0]?.id || undefined,
         message: 'Entity retrieved successfully',
+        success: true,
       };
     } catch (error) {
       return {
-        error: error instanceof Error ? error.message : 'Failed to fetch entity',
-        message: 'Failed to fetch entity',
+        entityId: undefined,
+        message: error instanceof Error ? error.message : 'Failed to fetch entity',
+        success: false,
       };
     }
   }
@@ -114,7 +131,7 @@ export const getEntity = api(
  */
 export const createEntity = api(
   { auth: true, method: 'POST', path: '/entities/:entity', expose: true },
-  async ({ entity, data }: CreateEntityRequest): Promise<ApiResponse<ContentEntity>> => {
+  async ({ entity, data }: CreateEntityRequest): Promise<EntityResponse> => {
     try {
       const authData = getAuthData() as AuthData;
 
@@ -126,13 +143,15 @@ export const createEntity = api(
       );
 
       return {
-        data: result,
+        entityId: result?.id || undefined,
         message: 'Entity created successfully',
+        success: true,
       };
     } catch (error) {
       return {
-        error: error instanceof Error ? error.message : 'Failed to create entity',
-        message: 'Failed to create entity',
+        entityId: undefined,
+        message: error instanceof Error ? error.message : 'Failed to create entity',
+        success: false,
       };
     }
   }
@@ -143,7 +162,7 @@ export const createEntity = api(
  */
 export const updateEntity = api(
   { auth: true, method: 'PUT', path: '/entities/:entity/:id', expose: true },
-  async ({ entity, id, data }: UpdateEntityRequest): Promise<ApiResponse<ContentEntity>> => {
+  async ({ entity, id, data }: UpdateEntityRequest): Promise<EntityResponse> => {
     try {
       const authData = getAuthData() as AuthData;
 
@@ -156,13 +175,15 @@ export const updateEntity = api(
       );
 
       return {
-        data: result,
+        entityId: result?.id || undefined,
         message: 'Entity updated successfully',
+        success: true,
       };
     } catch (error) {
       return {
-        error: error instanceof Error ? error.message : 'Failed to update entity',
-        message: 'Failed to update entity',
+        entityId: undefined,
+        message: error instanceof Error ? error.message : 'Failed to update entity',
+        success: false,
       };
     }
   }
@@ -173,7 +194,7 @@ export const updateEntity = api(
  */
 export const deleteEntity = api(
   { auth: true, method: 'DELETE', path: '/entities/:entity/:id', expose: true },
-  async ({ entity, id }: DeleteEntityRequest): Promise<ApiResponse<null>> => {
+  async ({ entity, id }: DeleteEntityRequest): Promise<DeleteResponse> => {
     try {
       const authData = getAuthData() as AuthData;
 
@@ -185,13 +206,15 @@ export const deleteEntity = api(
       );
 
       return {
-        data: null,
+        deletedCount: 1,
         message: 'Entity deleted successfully',
+        success: true,
       };
     } catch (error) {
       return {
-        error: error instanceof Error ? error.message : 'Failed to delete entity',
-        message: 'Failed to delete entity',
+        deletedCount: 0,
+        message: error instanceof Error ? error.message : 'Failed to delete entity',
+        success: false,
       };
     }
   }
@@ -202,11 +225,7 @@ export const deleteEntity = api(
  */
 export const upsertEntity = api(
   { auth: true, method: 'POST', path: '/entities/:entity/upsert', expose: true },
-  async ({
-    entity,
-    data,
-    conflictColumns,
-  }: UpsertEntityRequest): Promise<ApiResponse<ContentEntity>> => {
+  async ({ entity, data, conflictColumns }: UpsertEntityRequest): Promise<EntityResponse> => {
     try {
       const authData = getAuthData() as AuthData;
 
@@ -219,13 +238,15 @@ export const upsertEntity = api(
       );
 
       return {
-        data: result,
+        entityId: result?.id || undefined,
         message: 'Entity upserted successfully',
+        success: true,
       };
     } catch (error) {
       return {
-        error: error instanceof Error ? error.message : 'Failed to upsert entity',
-        message: 'Failed to upsert entity',
+        entityId: undefined,
+        message: error instanceof Error ? error.message : 'Failed to upsert entity',
+        success: false,
       };
     }
   }

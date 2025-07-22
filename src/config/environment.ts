@@ -1,4 +1,4 @@
-import { secret } from 'encore.dev/config';
+// import { secret } from 'encore.dev/config'; // Удаляем, так как не используем Encore Cloud
 import type { EnvironmentConfig } from './types';
 
 // Environment variable definitions
@@ -54,10 +54,10 @@ export const environmentConfig: EnvironmentConfig = {
   },
 };
 
-// Encore secrets (for production)
-const adminSupabaseUrl = secret('ADMIN_SUPABASE_URL');
-const adminSupabaseServiceKey = secret('ADMIN_SUPABASE_SERVICE_KEY');
-const tenantConfigSecret = secret('TENANT_CONFIG');
+// Убираем Encore secrets, используем обычные переменные окружения
+// const adminSupabaseUrl = secret('ADMIN_SUPABASE_URL');
+// const adminSupabaseServiceKey = secret('ADMIN_SUPABASE_SERVICE_KEY');
+// const tenantConfigSecret = secret('TENANT_CONFIG');
 
 /**
  * Get environment variable with type conversion and validation
@@ -114,18 +114,18 @@ export function getEnvVar<T = string>(
 }
 
 /**
- * Get Encore secret value
+ * Get environment variable value (previously secret)
  */
-export async function getSecret(key: string): Promise<string> {
+export function getSecret(key: string): string {
   switch (key) {
     case 'ADMIN_SUPABASE_URL':
-      return await adminSupabaseUrl();
+      return process.env[key] || '';
     case 'ADMIN_SUPABASE_SERVICE_KEY':
-      return await adminSupabaseServiceKey();
+      return process.env[key] || '';
     case 'TENANT_CONFIG':
-      return await tenantConfigSecret();
+      return process.env[key] || '';
     default:
-      throw new Error(`Unknown secret: ${key}`);
+      throw new Error(`Unknown environment variable: ${key}`);
   }
 }
 

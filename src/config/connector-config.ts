@@ -32,8 +32,8 @@ export async function loadConnectorConfig(): Promise<ConnectorConfig> {
     },
 
     supabase: {
-      adminUrl: await getSecret('ADMIN_SUPABASE_URL'),
-      adminServiceKey: await getSecret('ADMIN_SUPABASE_SERVICE_KEY'),
+      adminUrl: getSecret('ADMIN_SUPABASE_URL'),
+      adminServiceKey: getSecret('ADMIN_SUPABASE_SERVICE_KEY'),
       defaultOptions: {
         auth: {
           autoRefreshToken: getEnvVar('SUPABASE_AUTO_REFRESH', false, 'boolean'),

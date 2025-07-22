@@ -1,9 +1,13 @@
 // Общие типы для мульти-тенантного приложения
 
+// Типы коннекторов
+export type ConnectorType = 'supabase' | 'native';
+
 export interface TenantConfig {
   SUPABASE_URL: string;
   ANON_KEY: string;
   SERVICE_KEY: string;
+  connector_type?: ConnectorType; // Тип коннектора для тенанта
 }
 
 export interface TenantsConfig {

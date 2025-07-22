@@ -1,120 +1,127 @@
-import { Header, Gateway } from 'encore.dev/api';
+import { APIError, Header, Gateway } from 'encore.dev/api';
 import { authHandler } from 'encore.dev/auth';
-import { APIError } from 'encore.dev/api';
-import { getSupabaseAnonClient } from './supabaseClient';
+import { hasTenantConfig, getTenantConfigById } from '../../utilities/tenant-config';
+import { createClient } from '@supabase/supabase-js';
 
-// AuthParams specifies the incoming request information
-// the auth handler is interested in. Supports multiple auth methods:
-// - JWT tokens via Authorization header
-// - Session cookies
-// - API keys for service-to-service communication
-interface AuthParams {
-  authorization?: Header<'Authorization'>;
-  tenantId: Header<'X-Tenant-ID'>;
+// Auth parameters that Encore will parse from the request
+export interface AuthParams {
+  authorization: Header<'Authorization'>; // Bearer token or API key
+  tenantId: Header<'X-Tenant-ID'>; // Required tenant ID
 }
 
-// The AuthData specifies the information about the authenticated user
-// that the auth handler makes available to all endpoints
+// Auth data that will be available to all authenticated endpoints
 export interface AuthData {
   userID: string;
   tenantId: string;
-  email?: string;
-  role?: string;
-  sessionType: 'jwt' | 'session' | 'api_key';
+  userEmail?: string;
+  userRole?: string;
+  tokenType: 'jwt' | 'api_key';
 }
 
-// The centralized auth handler for all authentication methods
-export const auth = authHandler<AuthParams, AuthData>(async (params): Promise<AuthData> => {
-  const { authorization, tenantId } = params;
+/**
+ * Encore.ts Authentication Handler
+ * This function is called for all endpoints marked with auth: true
+ * It validates JWT tokens, API keys, and ensures tenant access
+ */
+export const auth = authHandler<AuthParams, AuthData>(
+  async (params: AuthParams): Promise<AuthData> => {
+    const { authorization, tenantId } = params;
 
-  if (!tenantId) {
-    throw APIError.unauthenticated('Tenant ID is required');
-  }
+    // Validate tenant ID is provided
+    if (!tenantId) {
+      throw APIError.invalidArgument('X-Tenant-ID header is required');
+    }
 
-  if (!authorization) {
-    throw APIError.unauthenticated('Authorization is required');
-  }
+    // Validate tenant exists and is active
+    const hasConfig = await hasTenantConfig(tenantId);
+    if (!hasConfig) {
+      throw APIError.notFound(`Tenant '${tenantId}' not found or inactive`);
+    }
 
-  try {
-    // Handle different authentication methods
-    if (authorization.startsWith('Bearer ')) {
-      // JWT Token authentication
-      const token = authorization.replace('Bearer ', '');
-      return await authenticateJWT(token, tenantId);
-    } else if (authorization.startsWith('ApiKey ')) {
-      // API Key authentication for service-to-service
-      const apiKey = authorization.replace('ApiKey ', '');
-      return await authenticateApiKey(apiKey, tenantId);
+    // Parse authorization header
+    if (!authorization) {
+      throw APIError.unauthenticated('Authorization header is required');
+    }
+
+    const authHeader = authorization;
+    let tokenType: 'jwt' | 'api_key';
+    let token: string;
+
+    if (authHeader.startsWith('Bearer ')) {
+      tokenType = 'jwt';
+      token = authHeader.substring(7);
+    } else if (authHeader.startsWith('ApiKey ')) {
+      tokenType = 'api_key';
+      token = authHeader.substring(7);
     } else {
-      throw APIError.unauthenticated('Invalid authorization format');
+      throw APIError.unauthenticated(
+        'Invalid authorization format. Use "Bearer <token>" or "ApiKey <key>"'
+      );
     }
-  } catch (error) {
-    console.error('Authentication error:', error);
-    throw APIError.unauthenticated('Authentication failed');
+
+    try {
+      if (tokenType === 'jwt') {
+        return await validateJWTToken(token, tenantId);
+      } else {
+        return await validateApiKey(token, tenantId);
+      }
+    } catch (error) {
+      console.error('Authentication error:', error);
+      throw APIError.unauthenticated('Invalid or expired token');
+    }
   }
-});
+);
 
-// JWT Token authentication using Supabase
-async function authenticateJWT(token: string, tenantId: string): Promise<AuthData> {
-  try {
-    const supabase = await getSupabaseAnonClient(tenantId);
+/**
+ * Validates JWT token against tenant's Supabase
+ */
+async function validateJWTToken(token: string, tenantId: string): Promise<AuthData> {
+  const config = await getTenantConfigById(tenantId);
+  const supabase = createClient(config.SUPABASE_URL, config.ANON_KEY);
 
-    // Set the JWT session in Supabase client
-    const {
-      data: { user },
-      error,
-    } = await supabase.auth.getUser(token);
+  // Verify JWT token with Supabase
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser(token);
 
-    if (error || !user) {
-      throw APIError.unauthenticated('Invalid JWT token');
-    }
+  if (error || !user) {
+    throw new Error('Invalid JWT token');
+  }
 
-    // Extract user information from JWT token
+  return {
+    userID: user.id,
+    tenantId,
+    userEmail: user.email,
+    userRole: user.user_metadata?.role || 'user',
+    tokenType: 'jwt',
+  };
+}
+
+/**
+ * Validates API key (for service-to-service communication)
+ */
+async function validateApiKey(apiKey: string, tenantId: string): Promise<AuthData> {
+  const config = await getTenantConfigById(tenantId);
+
+  // In a real implementation, you'd validate the API key against a database
+  // For now, we'll check if it matches the service key (for admin operations)
+  if (apiKey === config.SERVICE_KEY) {
     return {
-      userID: user.id,
+      userID: 'service',
       tenantId,
-      email: user.email,
-      role: user.user_metadata?.role || 'user',
-      sessionType: 'jwt',
+      tokenType: 'api_key',
+      userRole: 'service',
     };
-  } catch (error) {
-    throw APIError.unauthenticated('JWT authentication failed');
-  }
-}
-
-// API Key authentication for service-to-service communication
-async function authenticateApiKey(apiKey: string, tenantId: string): Promise<AuthData> {
-  try {
-    const { getServiceApiKey } = await import('./secrets');
-    const validApiKey = getServiceApiKey();
-
-    if (apiKey === validApiKey) {
-      return {
-        userID: 'service',
-        tenantId,
-        role: 'service',
-        sessionType: 'api_key',
-      };
-    }
-  } catch (error) {
-    // Fallback to environment variable for backwards compatibility
-    if (apiKey === process.env.SERVICE_API_KEY) {
-      return {
-        userID: 'service',
-        tenantId,
-        role: 'service',
-        sessionType: 'api_key',
-      };
-    }
   }
 
-  throw APIError.unauthenticated('Invalid API key');
+  throw new Error('Invalid API key');
 }
 
-// Create the API Gateway with centralized authentication
+/**
+ * Encore.ts Gateway with Authentication Handler
+ * This configures the API Gateway to use our auth handler
+ */
 export const gateway = new Gateway({
   authHandler: auth,
 });
-
-// Helper function to get authenticated user data in endpoints
-export { getAuthData } from '~encore/auth';

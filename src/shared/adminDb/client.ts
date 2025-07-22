@@ -9,7 +9,7 @@ import {
   UpdateTenantRequest,
 } from './types';
 
-import { getAdminSupabaseUrl, getAdminSupabaseServiceKey } from '../secrets';
+import { getAdminSupabaseUrl, getAdminSupabaseServiceKey } from '../utilities/helpers/secrets';
 
 // Modern configuration using Encore TS secrets
 // Fallback to environment variables for backwards compatibility
@@ -117,6 +117,7 @@ export async function getAllTenantConfigsLegacy(): Promise<LegacyTenantsConfig> 
         SUPABASE_URL: config.supabase_url,
         ANON_KEY: config.anon_key,
         SERVICE_KEY: config.service_key,
+        connector_type: config.connector_type || 'supabase', // Добавляем тип коннектора
       };
     }
 

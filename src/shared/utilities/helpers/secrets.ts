@@ -1,42 +1,42 @@
-import { secret } from 'encore.dev/config';
+// import { secret } from 'encore.dev/config'; // Убираем, так как не используем Encore Cloud
 
-// Modern secrets management using Encore TS best practices
-// These secrets are resolved at runtime and injected securely
+// Используем обычные переменные окружения вместо Encore secrets
+// These environment variables are resolved at runtime
 
 // Administrative Supabase configuration
-export const adminSupabaseUrl = secret('AdminSupabaseUrl');
-export const adminSupabaseServiceKey = secret('AdminSupabaseServiceKey');
+// export const adminSupabaseUrl = secret('AdminSupabaseUrl');
+// export const adminSupabaseServiceKey = secret('AdminSupabaseServiceKey');
 
 // Service-to-service API key for internal communication
-export const serviceApiKey = secret('ServiceApiKey');
+// export const serviceApiKey = secret('ServiceApiKey');
 
 // Tenant configurations (fallback for environment-based setup)
-export const tenantConfigSecret = secret('TenantConfig');
+// export const tenantConfigSecret = secret('TenantConfig');
 
-// Helper functions to get secret values
+// Helper functions to get environment variables
 export function getAdminSupabaseUrl(): string {
-  return adminSupabaseUrl();
+  return process.env.ADMIN_SUPABASE_URL || '';
 }
 
 export function getAdminSupabaseServiceKey(): string {
-  return adminSupabaseServiceKey();
+  return process.env.ADMIN_SUPABASE_SERVICE_KEY || '';
 }
 
 export function getServiceApiKey(): string {
-  return serviceApiKey();
+  return process.env.SERVICE_API_KEY || '';
 }
 
 export function getTenantConfigSecret(): string {
-  return tenantConfigSecret();
+  return process.env.TENANT_CONFIG || '{}';
 }
 
-// Parse tenant configuration from secret
+// Parse tenant configuration from environment variable
 export function parseSecretTenantConfig(): Record<string, any> {
   try {
     const configString = getTenantConfigSecret();
     return JSON.parse(configString);
   } catch (error) {
-    console.warn('Failed to parse tenant config from secret:', error);
+    console.warn('Failed to parse tenant config from environment variable:', error);
     return {};
   }
 }

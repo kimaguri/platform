@@ -2,6 +2,42 @@ import { api } from 'encore.dev/api';
 import { ApiResponse } from '../../shared/types';
 import type { ServiceRoute, RouteMatch } from '../src/models/gateway';
 
+// Tenant data interfaces for API endpoints
+interface TenantCreateData {
+  name: string;
+  description?: string;
+  settings?: Record<string, any>;
+  metadata?: Record<string, any>;
+}
+
+interface TenantUpdateData {
+  name?: string;
+  description?: string;
+  settings?: Record<string, any>;
+  metadata?: Record<string, any>;
+}
+
+interface TenantConfigData {
+  database?: {
+    host?: string;
+    port?: number;
+    name?: string;
+  };
+  features?: Record<string, boolean>;
+  limits?: Record<string, number>;
+  customSettings?: Record<string, any>;
+}
+
+interface TenantResponse {
+  id: string;
+  name: string;
+  description?: string;
+  settings?: Record<string, any>;
+  metadata?: Record<string, any>;
+  createdAt: string;
+  updatedAt: string;
+}
+
 // Tenant management service routes configuration
 export const tenantRoutes: ServiceRoute = {
   serviceName: 'tenant-management',
@@ -18,12 +54,12 @@ export const tenantRoutes: ServiceRoute = {
 // List tenants
 export const listTenants = api(
   { method: 'GET', path: '/api/v1/tenants', expose: true },
-  async (): Promise<ApiResponse<any>> => {
+  async (): Promise<ApiResponse<TenantResponse[]>> => {
     // This will be handled by the proxy system
     // For now, return a placeholder that indicates routing
     return {
       message: 'Route handled by tenant-management service',
-      data: null,
+      data: [],
     };
   }
 );
@@ -31,7 +67,7 @@ export const listTenants = api(
 // Get tenant by ID
 export const getTenant = api(
   { method: 'GET', path: '/api/v1/tenants/:tenantId', expose: true },
-  async ({ tenantId }: { tenantId: string }): Promise<ApiResponse<any>> => {
+  async ({ tenantId }: { tenantId: string }): Promise<ApiResponse<TenantResponse | null>> => {
     return {
       message: `Route for tenant ${tenantId} handled by tenant-management service`,
       data: null,
@@ -42,7 +78,7 @@ export const getTenant = api(
 // Create tenant
 export const createTenant = api(
   { method: 'POST', path: '/api/v1/tenants', expose: true },
-  async (data: any): Promise<ApiResponse<any>> => {
+  async (data: TenantCreateData): Promise<ApiResponse<TenantResponse | null>> => {
     return {
       message: 'Tenant creation handled by tenant-management service',
       data: null,
@@ -53,7 +89,10 @@ export const createTenant = api(
 // Update tenant
 export const updateTenant = api(
   { method: 'PUT', path: '/api/v1/tenants/:tenantId', expose: true },
-  async ({ tenantId, ...data }: { tenantId: string } & any): Promise<ApiResponse<any>> => {
+  async ({
+    tenantId,
+    ...data
+  }: { tenantId: string } & TenantUpdateData): Promise<ApiResponse<TenantResponse | null>> => {
     return {
       message: `Tenant ${tenantId} update handled by tenant-management service`,
       data: null,
@@ -64,10 +103,10 @@ export const updateTenant = api(
 // Delete tenant
 export const deleteTenant = api(
   { method: 'DELETE', path: '/api/v1/tenants/:tenantId', expose: true },
-  async ({ tenantId }: { tenantId: string }): Promise<ApiResponse<any>> => {
+  async ({ tenantId }: { tenantId: string }): Promise<ApiResponse<{ success: boolean }>> => {
     return {
       message: `Tenant ${tenantId} deletion handled by tenant-management service`,
-      data: null,
+      data: { success: true },
     };
   }
 );
@@ -75,7 +114,10 @@ export const deleteTenant = api(
 // Create tenant config
 export const createTenantConfig = api(
   { method: 'POST', path: '/api/v1/tenants/:tenantId/config', expose: true },
-  async ({ tenantId, ...data }: { tenantId: string } & any): Promise<ApiResponse<any>> => {
+  async ({
+    tenantId,
+    ...data
+  }: { tenantId: string } & TenantConfigData): Promise<ApiResponse<TenantConfigData | null>> => {
     return {
       message: `Config creation for tenant ${tenantId} handled by tenant-management service`,
       data: null,

@@ -1,5 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { getTenantConfigById } from './tenantConfig';
+import { getTenantConfigById } from '../tenant-config';
 
 // Enhanced caching system for better performance
 interface CacheEntry<T> {

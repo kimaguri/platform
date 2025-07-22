@@ -15,7 +15,6 @@
 		
 		"ADMIN_SUPABASE_URL": { "required": true },
 		"ADMIN_SUPABASE_SERVICE_KEY": { "required": true },
-		"TENANT_CONFIG": { "required": true },
 		
 		"CORS_ORIGINS": { "required": false, "default": "[\"http://localhost:3000\", \"http://localhost:5173\"]" },
 		"LOG_FORMAT": { "required": false, "default": "json" },

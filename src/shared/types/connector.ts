@@ -3,6 +3,7 @@
 export interface ConnectionConfig {
   url: string;
   key: string;
+  type?: string; // Тип коннектора
   options?: Record<string, any>;
 }
 

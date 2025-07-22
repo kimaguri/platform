@@ -1,7 +1,7 @@
 import { middleware } from 'encore.dev/api';
 import { APIError } from 'encore.dev/api';
 import { hasTenantConfig, getTenantConfigById } from './tenantConfig';
-import type { AuthData } from './auth';
+import type { AuthData } from './middleware/auth/auth-handler';
 
 // Cache for tenant validation to avoid repeated database calls
 const tenantValidationCache = new Map<string, number>();

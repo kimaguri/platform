@@ -258,7 +258,7 @@ export function validateEntityData(
 }
 
 // Convert validation errors to Encore API errors
-export function toAPIError(error: ValidationError): never {
+export function toAPIError(error: ValidationError): void {
   const errorMessage = error.field ? `${error.field}: ${error.message}` : error.message;
 
   throw APIError.invalidArgument(errorMessage);

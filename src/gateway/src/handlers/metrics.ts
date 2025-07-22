@@ -84,8 +84,8 @@ export const getMetrics = api(
  */
 export const getServiceMetrics = api(
   { method: 'GET', path: '/api/v1/metrics/:serviceName', expose: true },
-  async ({ serviceName }: { serviceName: string }): Promise<ServiceMetrics | null> => {
-    return gatewayMetrics.serviceMetrics[serviceName] || null;
+  async ({ serviceName }: { serviceName: string }): Promise<{ metrics: ServiceMetrics | null }> => {
+    return { metrics: gatewayMetrics.serviceMetrics[serviceName] || null };
   }
 );
 

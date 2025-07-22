@@ -2,6 +2,72 @@ import { api, Header } from 'encore.dev/api';
 import { ApiResponse } from '../../shared/types';
 import type { ServiceRoute, RouteMatch } from '../src/models/gateway';
 
+// User data interfaces for API endpoints
+interface UserLoginData {
+  tenantId: Header<'X-Tenant-ID'>;
+  email: string;
+  password: string;
+}
+
+interface UserRegisterData {
+  tenantId: Header<'X-Tenant-ID'>;
+  email: string;
+  password: string;
+  userData?: UserProfileData;
+}
+
+interface UserProfileData {
+  firstName?: string;
+  lastName?: string;
+  displayName?: string;
+  avatar?: string;
+  bio?: string;
+  preferences?: Record<string, any>;
+}
+
+interface UserUpdateData {
+  firstName?: string;
+  lastName?: string;
+  displayName?: string;
+  avatar?: string;
+  bio?: string;
+  preferences?: Record<string, any>;
+}
+
+interface UserRoleData {
+  role: string;
+  permissions?: string[];
+}
+
+interface AuthResponse {
+  token: string;
+  refreshToken?: string;
+  expiresAt: string;
+  user: UserResponse;
+}
+
+interface UserResponse {
+  id: string;
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  displayName?: string;
+  avatar?: string;
+  bio?: string;
+  role: string;
+  permissions?: string[];
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface UsersListResponse {
+  users: UserResponse[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
 // User management service routes configuration
 export const userRoutes: ServiceRoute = {
   serviceName: 'user-management',
@@ -19,14 +85,10 @@ export const userProfileRoutes: ServiceRoute = {
  * Authentication routes
  */
 
-// Login
-export const login = api(
+// User Login (renamed to avoid conflict with gateway auth.ts)
+export const userLogin = api(
   { method: 'POST', path: '/api/v1/auth/login', expose: true },
-  async (data: {
-    tenantId: Header<'X-Tenant-ID'>;
-    email: string;
-    password: string;
-  }): Promise<ApiResponse<any>> => {
+  async (data: UserLoginData): Promise<ApiResponse<AuthResponse | null>> => {
     return {
       message: 'Login handled by user-management service',
       data: null,
@@ -37,12 +99,7 @@ export const login = api(
 // Register
 export const register = api(
   { method: 'POST', path: '/api/v1/auth/register', expose: true },
-  async (data: {
-    tenantId: Header<'X-Tenant-ID'>;
-    email: string;
-    password: string;
-    userData?: any;
-  }): Promise<ApiResponse<any>> => {
+  async (data: UserRegisterData): Promise<ApiResponse<AuthResponse | null>> => {
     return {
       message: 'Registration handled by user-management service',
       data: null,
@@ -50,13 +107,17 @@ export const register = api(
   }
 );
 
-// Logout
-export const logout = api(
+// User Logout (renamed to avoid conflict with gateway auth.ts)
+export const userLogout = api(
   { method: 'POST', path: '/api/v1/auth/logout', expose: true },
-  async ({ tenantId }: { tenantId: Header<'X-Tenant-ID'> }): Promise<ApiResponse<any>> => {
+  async ({
+    tenantId,
+  }: {
+    tenantId: Header<'X-Tenant-ID'>;
+  }): Promise<ApiResponse<{ success: boolean }>> => {
     return {
       message: 'Logout handled by user-management service',
-      data: null,
+      data: { success: true },
     };
   }
 );
@@ -64,10 +125,13 @@ export const logout = api(
 // Reset password
 export const resetPassword = api(
   { method: 'POST', path: '/api/v1/auth/reset-password', expose: true },
-  async (data: { tenantId: Header<'X-Tenant-ID'>; email: string }): Promise<ApiResponse<any>> => {
+  async (data: {
+    tenantId: Header<'X-Tenant-ID'>;
+    email: string;
+  }): Promise<ApiResponse<{ success: boolean }>> => {
     return {
       message: 'Password reset handled by user-management service',
-      data: null,
+      data: { success: true },
     };
   }
 );
@@ -78,10 +142,10 @@ export const updatePassword = api(
   async (data: {
     tenantId: Header<'X-Tenant-ID'>;
     password: string;
-  }): Promise<ApiResponse<any>> => {
+  }): Promise<ApiResponse<{ success: boolean }>> => {
     return {
       message: 'Password update handled by user-management service',
-      data: null,
+      data: { success: true },
     };
   }
 );
@@ -93,10 +157,16 @@ export const updatePassword = api(
 // List users
 export const listUsers = api(
   { auth: true, method: 'GET', path: '/api/v1/users', expose: true },
-  async ({ limit, offset }: { limit?: number; offset?: number }): Promise<ApiResponse<any>> => {
+  async ({
+    limit,
+    offset,
+  }: {
+    limit?: number;
+    offset?: number;
+  }): Promise<ApiResponse<UsersListResponse>> => {
     return {
       message: 'User listing handled by user-management service',
-      data: null,
+      data: { users: [], total: 0, limit: limit || 10, offset: offset || 0 },
     };
   }
 );
@@ -104,7 +174,7 @@ export const listUsers = api(
 // Get user profile
 export const getUserProfile = api(
   { auth: true, method: 'GET', path: '/api/v1/users/:userId', expose: true },
-  async ({ userId }: { userId: string }): Promise<ApiResponse<any>> => {
+  async ({ userId }: { userId: string }): Promise<ApiResponse<UserResponse | null>> => {
     return {
       message: `User profile ${userId} handled by user-management service`,
       data: null,
@@ -115,7 +185,7 @@ export const getUserProfile = api(
 // Get my profile
 export const getMyProfile = api(
   { auth: true, method: 'GET', path: '/api/v1/users/me', expose: true },
-  async (): Promise<ApiResponse<any>> => {
+  async (): Promise<ApiResponse<UserResponse | null>> => {
     return {
       message: 'My profile handled by user-management service',
       data: null,
@@ -126,7 +196,7 @@ export const getMyProfile = api(
 // Update my profile
 export const updateMyProfile = api(
   { auth: true, method: 'PUT', path: '/api/v1/users/me', expose: true },
-  async (data: any): Promise<ApiResponse<any>> => {
+  async (data: UserUpdateData): Promise<ApiResponse<UserResponse | null>> => {
     return {
       message: 'Profile update handled by user-management service',
       data: null,
@@ -137,7 +207,10 @@ export const updateMyProfile = api(
 // Update user role
 export const updateUserRole = api(
   { auth: true, method: 'PUT', path: '/api/v1/users/:userId/role', expose: true },
-  async ({ userId, ...data }: { userId: string } & any): Promise<ApiResponse<any>> => {
+  async ({
+    userId,
+    ...data
+  }: { userId: string } & UserRoleData): Promise<ApiResponse<UserResponse | null>> => {
     return {
       message: `Role update for user ${userId} handled by user-management service`,
       data: null,
@@ -148,10 +221,10 @@ export const updateUserRole = api(
 // Deactivate user
 export const deactivateUser = api(
   { auth: true, method: 'DELETE', path: '/api/v1/users/:userId', expose: true },
-  async ({ userId }: { userId: string }): Promise<ApiResponse<any>> => {
+  async ({ userId }: { userId: string }): Promise<ApiResponse<{ success: boolean }>> => {
     return {
       message: `User ${userId} deactivation handled by user-management service`,
-      data: null,
+      data: { success: true },
     };
   }
 );
