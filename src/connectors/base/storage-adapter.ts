@@ -1,4 +1,4 @@
-import type { ConnectionConfig } from '../../shared/types/connector';
+import type { ConnectionConfig } from '../../lib/types/connector';
 
 /**
  * File metadata interface

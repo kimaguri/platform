@@ -1,6 +1,7 @@
 import { middleware } from 'encore.dev/api';
 import { getAuthData } from '~encore/auth';
 import type { AuthData } from '../auth';
+import { recordRequest } from '../endpoints/metrics-endpoints';
 
 interface RequestLog {
   timestamp: string;
@@ -14,6 +15,23 @@ interface RequestLog {
   status: number;
   success: boolean;
   error?: string;
+}
+
+/**
+ * Extract service name from API path
+ */
+function extractServiceName(path: string): string {
+  if (path.includes('/users/') || path.includes('/user/')) return 'user-management';
+  if (path.includes('/tenants/') || path.includes('/tenant/')) return 'tenant-management';
+  if (path.includes('/content/')) return 'content-management';
+  if (
+    path.includes('/health') ||
+    path.includes('/metrics') ||
+    path.includes('/ready') ||
+    path.includes('/live')
+  )
+    return 'api-gateway';
+  return 'api-gateway'; // Default to gateway
 }
 
 /**
@@ -74,6 +92,10 @@ export const loggingMiddleware = middleware(async (req, next) => {
     } else {
       console.error('API Error:', JSON.stringify(logEntry));
     }
+
+    // Record metrics
+    const serviceName = extractServiceName(path);
+    recordRequest(serviceName, duration, success);
 
     // In production, send to monitoring service
     // await sendToMonitoringService(logEntry);

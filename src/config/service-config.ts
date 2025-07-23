@@ -203,9 +203,24 @@ export function mergeServiceConfig(config: Partial<ServiceConfig>): ServiceConfi
     mergedServices[serviceName] = {
       ...defaultService,
       ...configService,
+      enabled: configService?.enabled ?? defaultService?.enabled ?? true,
+      endpoint: configService?.endpoint ?? defaultService?.endpoint ?? '',
+      healthEndpoint: configService?.healthEndpoint ?? defaultService?.healthEndpoint ?? '/health',
+      timeout: configService?.timeout ?? defaultService?.timeout ?? 30000,
+      retryAttempts: configService?.retryAttempts ?? defaultService?.retryAttempts ?? 3,
       circuitBreaker: {
-        ...defaultService.circuitBreaker,
-        ...configService?.circuitBreaker,
+        enabled:
+          configService?.circuitBreaker?.enabled ??
+          defaultService?.circuitBreaker?.enabled ??
+          false,
+        threshold:
+          configService?.circuitBreaker?.threshold ??
+          defaultService?.circuitBreaker?.threshold ??
+          5,
+        timeout:
+          configService?.circuitBreaker?.timeout ??
+          defaultService?.circuitBreaker?.timeout ??
+          60000,
       },
     };
   }

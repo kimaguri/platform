@@ -4,8 +4,8 @@ import { Service } from 'encore.dev/service';
  * User Management Service
  * Internal RPC service for user operations
  *
- * This service is called internally by the API Gateway
- * All external endpoints are now handled by the Gateway
- * No middleware needed - Gateway handles all cross-cutting concerns
+ * Functional approach - no classes, only pure functions
+ * No middleware - all handled by API Gateway
+ * Called internally by Gateway via RPC
  */
 export default new Service('user-management');

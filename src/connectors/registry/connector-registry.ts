@@ -1,169 +1,175 @@
-import { DatabaseAdapter } from '../base/database-adapter';
-import { SupabaseAdapter, SupabaseConfig } from '../supabase/supabase-adapter';
-import type { ConnectionConfig } from '../../shared/types/connector';
+import type { Adapter, AdapterFactory, AdapterConfig } from '../base';
+import { getConnectorType } from '../../lib/utils/connector-helper';
+import { getTenantConfigById } from '../../lib/utils/tenant-config';
+import createSupabaseAdapter from '../supabase';
+import createPostgresAdapter from '../postgres';
+import createMongoAdapter from '../mongodb';
 
 /**
- * Connector factory interface for creating connector instances
+ * Functional Connector Registry
+ * Manages adapter factories and creates adapters based on tenant configuration
+ * No classes - pure functional approach following Encore.ts best practices
  */
-export interface ConnectorFactory {
-  create(config: ConnectionConfig): Promise<DatabaseAdapter>;
-  getType(): string;
+
+// Registry state - functional approach
+interface RegistryState {
+  factories: Map<string, AdapterFactory>;
+  cache: Map<string, Adapter>;
+}
+
+const registryState: RegistryState = {
+  factories: new Map(),
+  cache: new Map(),
+};
+
+/**
+ * Initialize the registry with default adapter factories
+ */
+export function initializeConnectorRegistry(): void {
+  // Register Supabase adapter factory
+  registryState.factories.set('supabase', (config) =>
+    createSupabaseAdapter({
+      ...config,
+      supabaseUrl: config.supabaseUrl || config.url,
+      supabaseKey: config.supabaseKey || config.key,
+    })
+  );
+
+  // Register PostgreSQL adapter factory
+  registryState.factories.set('postgres', (config) =>
+    createPostgresAdapter({
+      ...config,
+      connectionString: config.connectionString || config.url,
+    })
+  );
+
+  // Register MongoDB adapter factory
+  registryState.factories.set('mongodb', (config) =>
+    createMongoAdapter({
+      ...config,
+      uri: config.uri || config.url,
+      dbName: config.dbName || config.database,
+    })
+  );
 }
 
 /**
- * Supabase connector factory
+ * Register a new adapter factory
  */
-export class SupabaseConnectorFactory implements ConnectorFactory {
-  getType(): string {
-    return 'supabase';
-  }
-
-  async create(config: ConnectionConfig): Promise<DatabaseAdapter> {
-    const supabaseConfig = config as SupabaseConfig;
-    const adapter = new SupabaseAdapter(supabaseConfig);
-    await adapter.connect();
-    return adapter;
-  }
+export function registerAdapterFactory(type: string, factory: AdapterFactory): void {
+  registryState.factories.set(type, factory);
 }
 
 /**
- * Connector registry for managing different types of database connectors
- * Implements the Factory pattern for connector creation
+ * Get available connector types
  */
-export class ConnectorRegistry {
-  private factories: Map<string, ConnectorFactory> = new Map();
-  private instances: Map<string, DatabaseAdapter> = new Map();
+export function getAvailableConnectorTypes(): string[] {
+  return Array.from(registryState.factories.keys());
+}
 
-  constructor() {
-    // Register default connectors
-    this.registerConnector('supabase', new SupabaseConnectorFactory());
+/**
+ * Get adapter for tenant - integrates with existing connector-type system
+ */
+export async function getAdapterForTenant(tenantId: string, table: string): Promise<Adapter> {
+  const cacheKey = `${tenantId}:${table}`;
+
+  // Check cache first
+  if (registryState.cache.has(cacheKey)) {
+    return registryState.cache.get(cacheKey)!;
   }
 
-  /**
-   * Register a connector factory
-   * @param type Connector type name
-   * @param factory Connector factory instance
-   */
-  registerConnector(type: string, factory: ConnectorFactory): void {
-    this.factories.set(type, factory);
-  }
+  try {
+    // Get connector type from existing system
+    const connectorType = await getConnectorType(tenantId);
 
-  /**
-   * Get a connector instance for a tenant
-   * @param tenantId Tenant identifier
-   * @param connectorType Type of connector to use
-   * @param config Connection configuration
-   * @returns Database adapter instance
-   */
-  async getConnector(
-    tenantId: string,
-    connectorType: string,
-    config: ConnectionConfig
-  ): Promise<DatabaseAdapter> {
-    const cacheKey = `${tenantId}:${connectorType}`;
+    // Get tenant configuration
+    const tenantConfig = await getTenantConfigById(tenantId);
 
-    // Return cached instance if available
-    if (this.instances.has(cacheKey)) {
-      const instance = this.instances.get(cacheKey)!;
-      if (instance.isConnected()) {
-        return instance;
-      } else {
-        // Remove disconnected instance from cache
-        this.instances.delete(cacheKey);
-      }
+    if (!tenantConfig) {
+      throw new Error(`Tenant configuration not found for tenant: ${tenantId}`);
     }
 
-    // Get factory for connector type
-    const factory = this.factories.get(connectorType);
+    // Get adapter factory for connector type
+    const factory = registryState.factories.get(connectorType);
     if (!factory) {
-      throw new Error(`Connector type '${connectorType}' not registered`);
+      throw new Error(`No adapter factory registered for connector type: ${connectorType}`);
     }
 
-    // Create and cache new instance
-    const connector = await factory.create(config);
-    this.instances.set(cacheKey, connector);
-    return connector;
-  }
-
-  /**
-   * Get connector for tenant using tenant configuration
-   * @param tenantId Tenant identifier
-   * @param getTenantConfig Function to get tenant configuration
-   * @returns Database adapter instance
-   */
-  async getConnectorForTenant(
-    tenantId: string,
-    getTenantConfig: (tenantId: string) => Promise<{
-      connectorType: string;
-      config: ConnectionConfig;
-    }>
-  ): Promise<DatabaseAdapter> {
-    const tenantConfig = await getTenantConfig(tenantId);
-    return this.getConnector(tenantId, tenantConfig.connectorType, tenantConfig.config);
-  }
-
-  /**
-   * Remove a connector instance from cache
-   * @param tenantId Tenant identifier
-   * @param connectorType Connector type
-   */
-  async removeConnector(tenantId: string, connectorType: string): Promise<void> {
-    const cacheKey = `${tenantId}:${connectorType}`;
-    const instance = this.instances.get(cacheKey);
-
-    if (instance) {
-      await instance.disconnect();
-      this.instances.delete(cacheKey);
-    }
-  }
-
-  /**
-   * Get all registered connector types
-   * @returns Array of connector type names
-   */
-  getRegisteredTypes(): string[] {
-    return Array.from(this.factories.keys());
-  }
-
-  /**
-   * Get statistics about cached connectors
-   * @returns Statistics object
-   */
-  getStats(): {
-    totalFactories: number;
-    totalInstances: number;
-    connectedInstances: number;
-    instancesByType: Record<string, number>;
-  } {
-    const instancesByType: Record<string, number> = {};
-    let connectedInstances = 0;
-
-    for (const [key, instance] of this.instances.entries()) {
-      const type = key.split(':')[1];
-      instancesByType[type] = (instancesByType[type] || 0) + 1;
-
-      if (instance.isConnected()) {
-        connectedInstances++;
-      }
-    }
-
-    return {
-      totalFactories: this.factories.size,
-      totalInstances: this.instances.size,
-      connectedInstances,
-      instancesByType,
+    // Prepare adapter configuration
+    const adapterConfig: AdapterConfig & { table: string } = {
+      type: connectorType as 'supabase' | 'postgres' | 'mongodb',
+      table,
+      // Supabase specific config
+      supabaseUrl: tenantConfig.SUPABASE_URL,
+      supabaseKey: tenantConfig.ANON_KEY,
+      url: tenantConfig.SUPABASE_URL,
+      key: tenantConfig.ANON_KEY,
+      // PostgreSQL specific config (for future use)
+      connectionString: (tenantConfig as any).DATABASE_URL || (tenantConfig as any).POSTGRES_URL,
+      // MongoDB specific config (for future use)
+      uri: (tenantConfig as any).MONGODB_URI,
+      dbName: (tenantConfig as any).MONGODB_DATABASE || (tenantConfig as any).DATABASE_NAME,
+      database: (tenantConfig as any).DATABASE_NAME,
     };
-  }
 
-  /**
-   * Disconnect all connector instances
-   */
-  async disconnectAll(): Promise<void> {
-    const disconnectPromises = Array.from(this.instances.values()).map((instance) =>
-      instance.disconnect().catch((error) => console.error('Error disconnecting connector:', error))
-    );
+    // Create adapter
+    const adapter = factory(adapterConfig);
 
-    await Promise.all(disconnectPromises);
-    this.instances.clear();
+    // Connect adapter
+    await adapter.connect();
+
+    // Cache adapter
+    registryState.cache.set(cacheKey, adapter);
+
+    return adapter;
+  } catch (error) {
+    console.error(`Failed to get adapter for tenant ${tenantId}:`, error);
+    throw error;
   }
 }
+
+/**
+ * Clear cache for tenant (useful for configuration changes)
+ */
+export function clearCacheForTenant(tenantId: string): void {
+  const keysToDelete = Array.from(registryState.cache.keys()).filter((key) =>
+    key.startsWith(`${tenantId}:`)
+  );
+
+  keysToDelete.forEach((key) => registryState.cache.delete(key));
+}
+
+/**
+ * Clear all cache
+ */
+export function clearAllCache(): void {
+  registryState.cache.clear();
+}
+
+/**
+ * Get cache stats
+ */
+export function getCacheStats(): { size: number; keys: string[] } {
+  return {
+    size: registryState.cache.size,
+    keys: Array.from(registryState.cache.keys()),
+  };
+}
+
+/**
+ * Disconnect all cached adapters
+ */
+export async function disconnectAllAdapters(): Promise<void> {
+  const disconnectPromises = Array.from(registryState.cache.values()).map((adapter) => {
+    if (adapter.disconnect) {
+      return adapter.disconnect();
+    }
+    return Promise.resolve();
+  });
+
+  await Promise.all(disconnectPromises);
+  registryState.cache.clear();
+}
+
+// Initialize registry on module load
+initializeConnectorRegistry();

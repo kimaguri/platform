@@ -1,6 +1,6 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { DatabaseAdapter } from '../base/database-adapter';
-import type { QueryParams, ConnectionConfig } from '../../shared/types/connector';
+import type { QueryParams, ConnectionConfig } from '../../lib/types/connector';
 
 /**
  * Supabase configuration interface

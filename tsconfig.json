@@ -8,7 +8,7 @@
     "types": ["node"],
     "paths": {
       "~encore/*": ["./encore.gen/*"],
-      "@shared/*": ["./src/shared/*"],
+      "@lib/*": ["./src/lib/*"],
       "@config/*": ["./src/config/*"],
       "@connectors/*": ["./src/connectors/*"],
       "@services/*": ["./src/services/*"],

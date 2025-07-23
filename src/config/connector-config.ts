@@ -188,9 +188,17 @@ export function mergeConnectorConfig(config: Partial<ConnectorConfig>): Connecto
     mergedConnectors[connectorType] = {
       ...defaultConnector,
       ...configConnector,
+      enabled: configConnector?.enabled ?? defaultConnector?.enabled ?? true,
+      poolSize: configConnector?.poolSize ?? defaultConnector?.poolSize ?? 10,
+      timeout: configConnector?.timeout ?? defaultConnector?.timeout ?? 30000,
+      retryAttempts: configConnector?.retryAttempts ?? defaultConnector?.retryAttempts ?? 3,
       healthCheck: {
-        ...defaultConnector.healthCheck,
-        ...configConnector?.healthCheck,
+        enabled:
+          configConnector?.healthCheck?.enabled ?? defaultConnector?.healthCheck?.enabled ?? true,
+        interval:
+          configConnector?.healthCheck?.interval ??
+          defaultConnector?.healthCheck?.interval ??
+          30000,
       },
     };
   }

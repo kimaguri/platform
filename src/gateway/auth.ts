@@ -1,27 +1,21 @@
-import { Header, Gateway } from 'encore.dev/api';
+import { APIError, Header, Gateway } from 'encore.dev/api';
 import { authHandler } from 'encore.dev/auth';
-import { APIError } from 'encore.dev/api';
-import { hasTenantConfig, getTenantConfigById } from '../shared/utilities/tenant-config';
+import { hasTenantConfig, getTenantConfigById } from '../lib/utils/tenant-config';
 import { createClient } from '@supabase/supabase-js';
 
-// AuthParams specifies the incoming request information
-// the auth handler is interested in
-interface AuthParams {
-  authorization: Header<'Authorization'>;
-  tenantId: Header<'X-Tenant-ID'>;
+// Auth parameters that Encore will parse from the request
+export interface AuthParams {
+  authorization: Header<'Authorization'>; // Bearer token or API key
+  tenantId: Header<'X-Tenant-ID'>; // Required tenant ID
 }
 
-// AuthData specifies the information about the authenticated user
-// that the auth handler makes available throughout the application
+// Auth data that will be available to all authenticated endpoints
 export interface AuthData {
   userID: string;
   tenantId: string;
   userEmail?: string;
-  role?: string;
-  permissions?: string[];
+  userRole?: string;
   tokenType: 'jwt' | 'api_key';
-  sessionId?: string;
-  locale?: string;
 }
 
 /**
@@ -95,21 +89,12 @@ async function validateJWTToken(token: string, tenantId: string): Promise<AuthDa
     throw new Error('Invalid JWT token');
   }
 
-  // Get user profile with role and permissions
-  const { data: profile } = await supabase
-    .from('user_profiles')
-    .select('role, permissions, locale')
-    .eq('user_id', user.id)
-    .single();
-
   return {
     userID: user.id,
     tenantId,
     userEmail: user.email,
-    role: profile?.role || 'user',
-    permissions: profile?.permissions || [],
+    userRole: user.user_metadata?.role || 'user',
     tokenType: 'jwt',
-    locale: profile?.locale || 'en',
   };
 }
 
@@ -119,14 +104,14 @@ async function validateJWTToken(token: string, tenantId: string): Promise<AuthDa
 async function validateApiKey(apiKey: string, tenantId: string): Promise<AuthData> {
   const config = await getTenantConfigById(tenantId);
 
-  // Validate API key against service key (for admin operations)
+  // In a real implementation, you'd validate the API key against a database
+  // For now, we'll check if it matches the service key (for admin operations)
   if (apiKey === config.SERVICE_KEY) {
     return {
       userID: 'service',
       tenantId,
       tokenType: 'api_key',
-      role: 'service',
-      permissions: ['*'], // Service has all permissions
+      userRole: 'service',
     };
   }
 

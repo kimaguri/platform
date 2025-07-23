@@ -9,3 +9,6 @@ import { Service } from 'encore.dev/service';
  * No middleware needed - Gateway handles all cross-cutting concerns
  */
 export default new Service('content-management');
+
+// Import API endpoints to register them with the service
+import './api';

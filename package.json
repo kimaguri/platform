@@ -17,21 +17,34 @@
   "author": "SimplX Platform Team",
   "scripts": {
     "test": "vitest",
+    "test:watch": "vitest --watch",
+    "test:coverage": "vitest --coverage",
     "dev": "encore run",
+    "dev:watch": "encore run --watch",
     "build": "encore build",
+    "build:prod": "encore build --env=prod",
     "deploy": "encore deploy",
+    "deploy:staging": "encore deploy --env=staging",
+    "deploy:prod": "encore deploy --env=prod",
     "lint": "tsc --noEmit",
-    "type-check": "tsc --noEmit --skipLibCheck"
+    "lint:fix": "tsc --noEmit && prettier --write src/**/*.ts",
+    "type-check": "tsc --noEmit --skipLibCheck",
+    "gen": "encore gen client",
+    "clean": "rm -rf dist encore.gen",
+    "start": "node dist/main.js"
   },
   "devDependencies": {
     "@types/node": "^20.5.7",
+    "@types/pg": "^8.10.9",
     "typescript": "^5.2.2",
     "vitest": "^1.5.0"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.52.0",
     "dotenv": "^17.2.0",
-    "encore.dev": "^1.48.10"
+    "encore.dev": "^1.48.10",
+    "pg": "^8.11.3",
+    "mongodb": "^6.3.0"
   },
   "engines": {
     "node": ">=18.0.0"

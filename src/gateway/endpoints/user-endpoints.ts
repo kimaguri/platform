@@ -240,7 +240,6 @@ export const listUsers = api(
     try {
       // Proxy to user-management service
       const result = await userManagementClient.listUsers({
-        tenantId: authData.tenantId,
         limit: limit || 50,
         offset: offset || 0,
       });

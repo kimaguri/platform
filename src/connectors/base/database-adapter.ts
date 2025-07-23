@@ -1,4 +1,4 @@
-import type { QueryParams, ConnectionConfig } from '../../shared/types/connector';
+import type { QueryParams, ConnectionConfig } from '../../lib/types/connector';
 
 /**
  * Abstract database adapter providing unified interface for different database systems

@@ -2,7 +2,9 @@
 
 export interface ContentEntity {
   id?: string; // Optional for creation
-  [key: string]: any; // Dynamic entity data
+  created_at?: string;
+  updated_at?: string;
+  // Note: Dynamic fields will be handled as Record<string, any> in service layer
 }
 
 export interface ExtensionDefinition {

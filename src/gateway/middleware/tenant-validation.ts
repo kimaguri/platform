@@ -1,6 +1,6 @@
 import { middleware } from 'encore.dev/api';
 import { APIError } from 'encore.dev/api';
-import { hasTenantConfig } from '../../shared/utilities/tenant-config';
+import { hasTenantConfig } from '../../lib/utils/tenant-config';
 
 /**
  * Tenant Validation Middleware
