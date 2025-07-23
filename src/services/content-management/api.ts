@@ -12,6 +12,71 @@ import type {
   ExtensionFieldValue,
 } from './src/extensible-fields';
 
+// ===== ENCORE-COMPATIBLE TYPES =====
+
+/**
+ * Base fields that all entities have
+ */
+export interface BaseFields {
+  id: string;
+  created_at?: string;
+  updated_at?: string;
+  name?: string;
+  title?: string;
+  description?: string;
+  status?: string;
+  type?: string;
+}
+
+/**
+ * Raw map for unknown additional fields
+ */
+export type RawMap = Record<string, unknown>;
+
+/**
+ * Encore-compatible payload type for entities with extensions
+ * Uses __raw to capture unknown fields, avoiding index signature issues
+ */
+export type Payload<TAdditional extends RawMap = RawMap> = BaseFields & {
+  extensions: ExtensionFieldValue;
+  __raw?: TAdditional;
+};
+
+// ===== CONVERTER FUNCTIONS =====
+
+/**
+ * Convert EntityWithExtensions to Encore-compatible Payload
+ */
+export function toPayload(entity: EntityWithExtensions): Payload {
+  const { id, created_at, updated_at, name, title, description, status, type, extensions, ...raw } =
+    entity as any;
+
+  return {
+    id,
+    created_at,
+    updated_at,
+    name,
+    title,
+    description,
+    status,
+    type,
+    extensions,
+    __raw: Object.keys(raw).length > 0 ? raw : undefined,
+  };
+}
+
+/**
+ * Convert Payload back to EntityWithExtensions for internal use
+ */
+export function fromPayload(payload: Payload): EntityWithExtensions {
+  const { __raw, ...baseFields } = payload;
+
+  return {
+    ...baseFields,
+    ...(__raw || {}),
+  } as EntityWithExtensions;
+}
+
 /**
  * Content Management API Endpoints
  * Universal RPC endpoints for entities with extensible fields
@@ -42,9 +107,22 @@ export const getEntityWithExtensions = api(
   }: {
     entityTable: string;
     entityId: string;
-  }): Promise<ApiResponse<EntityWithExtensions>> => {
+  }): Promise<ApiResponse<Payload>> => {
     const authData = getAuthData() as AuthData;
-    return ContentService.getEntityWithExtensions(authData.tenantId, entityTable, entityId);
+    const result = await ContentService.getEntityWithExtensions(
+      authData.tenantId,
+      entityTable,
+      entityId
+    );
+
+    if (result.error) {
+      return result as ApiResponse<Payload>;
+    }
+
+    return {
+      data: toPayload(result.data!),
+      message: result.message,
+    };
   }
 );
 
@@ -68,7 +146,7 @@ export const getEntitiesWithExtensions = api(
     sorters?: Query<string>; // JSON string with ExtensionFieldsSorter[]
   }): Promise<
     ApiResponse<{
-      data: EntityWithExtensions[];
+      data: Payload[];
       total: number;
       pagination: { limit: number; offset: number; hasMore: boolean };
     }>
@@ -101,7 +179,11 @@ export const getEntitiesWithExtensions = api(
     });
 
     if (result.error) {
-      return result;
+      return result as unknown as ApiResponse<{
+        data: Payload[];
+        total: number;
+        pagination: { limit: number; offset: number; hasMore: boolean };
+      }>;
     }
 
     // Добавляем информацию о пагинации
@@ -113,7 +195,7 @@ export const getEntitiesWithExtensions = api(
 
     return {
       data: {
-        data: result.data!.data,
+        data: result.data!.data.map(toPayload),
         total: result.data!.total,
         pagination,
       },
@@ -133,16 +215,29 @@ export const createEntityWithExtensions = api(
     extensionFields,
   }: {
     entityTable: string;
-    entityData: Record<string, any>;
+    entityData: Payload;
     extensionFields?: ExtensionFieldValue;
-  }): Promise<ApiResponse<EntityWithExtensions>> => {
+  }): Promise<ApiResponse<Payload>> => {
     const authData = getAuthData() as AuthData;
-    return ContentService.createEntityWithExtensions(
+
+    // Convert Payload back to internal format
+    const internalEntityData = fromPayload(entityData);
+
+    const result = await ContentService.createEntityWithExtensions(
       authData.tenantId,
       entityTable,
-      entityData,
+      internalEntityData,
       extensionFields || {}
     );
+
+    if (result.error) {
+      return result as ApiResponse<Payload>;
+    }
+
+    return {
+      data: toPayload(result.data!),
+      message: result.message,
+    };
   }
 );
 
@@ -159,17 +254,30 @@ export const updateEntityWithExtensions = api(
   }: {
     entityTable: string;
     entityId: string;
-    entityData?: Record<string, any>;
+    entityData?: Payload;
     extensionFields?: ExtensionFieldValue;
-  }): Promise<ApiResponse<EntityWithExtensions>> => {
+  }): Promise<ApiResponse<Payload>> => {
     const authData = getAuthData() as AuthData;
-    return ContentService.updateEntityWithExtensions(
+
+    // Convert Payload back to internal format if provided
+    const internalEntityData = entityData ? fromPayload(entityData) : {};
+
+    const result = await ContentService.updateEntityWithExtensions(
       authData.tenantId,
       entityTable,
       entityId,
-      entityData || {},
+      internalEntityData,
       extensionFields
     );
+
+    if (result.error) {
+      return result as ApiResponse<Payload>;
+    }
+
+    return {
+      data: toPayload(result.data!),
+      message: result.message,
+    };
   }
 );
 
@@ -209,7 +317,7 @@ export const getUsers = api(
     sorters?: Query<string>;
   }): Promise<
     ApiResponse<{
-      data: EntityWithExtensions[];
+      data: Payload[];
       total: number;
       pagination: { limit: number; offset: number; hasMore: boolean };
     }>
@@ -237,7 +345,11 @@ export const getUsers = api(
     });
 
     if (result.error) {
-      return result;
+      return result as unknown as ApiResponse<{
+        data: Payload[];
+        total: number;
+        pagination: { limit: number; offset: number; hasMore: boolean };
+      }>;
     }
 
     const pagination = {
@@ -248,7 +360,7 @@ export const getUsers = api(
 
     return {
       data: {
-        data: result.data!.data,
+        data: result.data!.data.map(toPayload),
         total: result.data!.total,
         pagination,
       },
@@ -274,7 +386,7 @@ export const getLeads = api(
     sorters?: Query<string>;
   }): Promise<
     ApiResponse<{
-      data: EntityWithExtensions[];
+      data: Payload[];
       total: number;
       pagination: { limit: number; offset: number; hasMore: boolean };
     }>
@@ -302,7 +414,11 @@ export const getLeads = api(
     });
 
     if (result.error) {
-      return result;
+      return result as unknown as ApiResponse<{
+        data: Payload[];
+        total: number;
+        pagination: { limit: number; offset: number; hasMore: boolean };
+      }>;
     }
 
     const pagination = {
@@ -313,7 +429,7 @@ export const getLeads = api(
 
     return {
       data: {
-        data: result.data!.data,
+        data: result.data!.data.map(toPayload),
         total: result.data!.total,
         pagination,
       },
@@ -339,7 +455,7 @@ export const getProjects = api(
     sorters?: Query<string>;
   }): Promise<
     ApiResponse<{
-      data: EntityWithExtensions[];
+      data: Payload[];
       total: number;
       pagination: { limit: number; offset: number; hasMore: boolean };
     }>
@@ -367,7 +483,11 @@ export const getProjects = api(
     });
 
     if (result.error) {
-      return result;
+      return result as unknown as ApiResponse<{
+        data: Payload[];
+        total: number;
+        pagination: { limit: number; offset: number; hasMore: boolean };
+      }>;
     }
 
     const pagination = {
@@ -378,7 +498,7 @@ export const getProjects = api(
 
     return {
       data: {
-        data: result.data!.data,
+        data: result.data!.data.map(toPayload),
         total: result.data!.total,
         pagination,
       },

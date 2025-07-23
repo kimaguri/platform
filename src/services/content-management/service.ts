@@ -1,5 +1,5 @@
 import type { ApiResponse } from '../../lib/types';
-import { getConnectorRegistry } from '../../connectors/registry/connector-registry';
+import { getAdapterForTenant } from '../../connectors/registry/connector-registry';
 import type { Adapter } from '../../connectors/base';
 
 // Import extensible fields functions
@@ -184,8 +184,7 @@ export async function deleteEntity(
 ): Promise<ApiResponse<boolean>> {
   try {
     // Get adapter for tenant database
-    const registry = getConnectorRegistry();
-    const adapter = await registry.getAdapter(tenantId, entityTable);
+    const adapter = await getAdapterForTenant(tenantId, entityTable);
 
     // Delete the entity
     const success = await adapter.delete(entityId);

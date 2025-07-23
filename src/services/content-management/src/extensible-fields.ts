@@ -26,20 +26,45 @@ import {
  * Работает с тенантскими БД через коннекторы для значений полей
  */
 
-// Типы для работы с расширяемыми полями
-export interface ExtensionFieldValue {
-  [fieldName: string]: any;
+// Типы для работы с расширяемыми полями - Best Practice подходы совместимые с Encore
+
+/**
+ * Базовые поля, которые есть у всех сущностей
+ */
+export interface BaseEntityFields {
+  id: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
-export interface EntityWithExtensions {
-  [key: string]: any;
+/**
+ * Значения расширяемых полей - используем interface с индексной сигнатурой (но без дополнительных полей)
+ */
+export interface ExtensionFieldValue {
+  [fieldName: string]: unknown;
+}
+
+/**
+ * Сущность с расширяемыми полями - Encore совместимый подход
+ * Используем только interface без индексных сигнатур
+ */
+export type EntityWithExtensions = BaseEntityFields &
+  Record<string, unknown> & {
+    extensions: ExtensionFieldValue;
+  };
+
+/**
+ * Generic тип для типизированных сущностей с расширениями
+ */
+export interface TypedEntityWithExtensions<T = {}> extends BaseEntityFields {
   extensions: ExtensionFieldValue;
+  data: T;
 }
 
 export interface ExtensionFieldsFilter {
   field: string;
   operator: 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte' | 'like' | 'in' | 'not_in';
-  value: any;
+  value: unknown;
 }
 
 export interface ExtensionFieldsSorter {
