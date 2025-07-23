@@ -1,365 +1,333 @@
 import type { ApiResponse } from '../../lib/types';
-import type { ContentEntity } from './src/models/content';
+import { getConnectorRegistry } from '../../connectors/registry/connector-registry';
+import type { Adapter } from '../../connectors/base';
+
+// Import extensible fields functions
 import {
-  queryResource,
-  getResource,
-  createResource,
-  updateResource,
-  deleteResource,
-  countResources,
-  queryResourcesPaginated,
-} from '../../connectors/registry/resource-resolver';
+  getEntityWithExtensions as getEntityWithExtensionsFromModule,
+  getEntitiesWithExtensions as getEntitiesWithExtensionsFromModule,
+  createEntityWithExtensions as createEntityWithExtensionsFromModule,
+  updateEntityWithExtensions as updateEntityWithExtensionsFromModule,
+  parseExtensionFieldValues,
+  invalidateFieldDefinitionsCache,
+  getFieldDefinitionsCacheStats,
+  type EntityWithExtensions,
+  type ExtensionFieldsFilter,
+  type ExtensionFieldsSorter,
+  type ExtensionFieldValue,
+} from './src/extensible-fields';
 
 /**
  * Content Management Business Logic
- * Functional approach using ResourceResolver
+ * Functional approach using connectors for database abstraction
+ * Integrates with extensible fields functionality
  * No classes - pure functions only
  */
 
 /**
- * Get entity list with pagination
+ * Health check for content management service
  */
-export async function getEntityList(
-  tenantId: string,
-  entityType: string,
-  params: { limit?: number; offset?: number }
-): Promise<ApiResponse<Record<string, any>[]>> {
+export async function performHealthCheck(): Promise<
+  ApiResponse<{ status: string; timestamp: string }>
+> {
   try {
-    const { limit = 100, offset = 0 } = params;
-
-    const entities = await queryResource<ContentEntity>(tenantId, entityType, {
-      limit,
-      offset,
-      orderBy: [{ field: 'created_at', direction: 'desc' }],
-    });
-
+    // Basic health check - could be extended to check database connectivity
     return {
-      data: entities,
-      message: `Retrieved ${entities.length} ${entityType} entities`,
+      data: {
+        status: 'healthy',
+        timestamp: new Date().toISOString(),
+      },
+      message: 'Content Management Service is healthy',
     };
   } catch (error) {
     return {
-      error: error instanceof Error ? error.message : 'Failed to fetch entities',
-      message: 'Failed to fetch entities',
+      error: error instanceof Error ? error.message : 'Health check failed',
+      message: 'Content Management Service health check failed',
     };
   }
 }
 
+// ===== EXTENSIBLE FIELDS FUNCTIONS =====
+
 /**
- * Get single entity by ID
+ * Get single entity with extensible fields
  */
-export async function getEntityById(
+export async function getEntityWithExtensions(
   tenantId: string,
-  entityType: string,
+  entityTable: string,
   entityId: string
-): Promise<ApiResponse<Record<string, any>>> {
+): Promise<ApiResponse<EntityWithExtensions>> {
   try {
-    const entity = await getResource<ContentEntity>(tenantId, entityType, entityId);
+    const entity = await getEntityWithExtensionsFromModule(tenantId, entityTable, entityId);
 
     if (!entity) {
       return {
-        error: 'Entity not found',
+        error: `Entity with id ${entityId} not found in ${entityTable}`,
         message: 'Entity not found',
       };
     }
 
     return {
       data: entity,
-      message: 'Entity retrieved successfully',
+      message: `Retrieved ${entityTable} entity with extensions`,
     };
   } catch (error) {
     return {
-      error: error instanceof Error ? error.message : 'Failed to fetch entity',
-      message: 'Failed to fetch entity',
+      error: error instanceof Error ? error.message : 'Failed to fetch entity with extensions',
+      message: 'Failed to fetch entity with extensions',
     };
   }
 }
 
 /**
- * Create new entity
+ * Get list of entities with extensible fields
  */
-export async function createNewEntity(
+export async function getEntitiesWithExtensions(
   tenantId: string,
-  entityType: string,
-  data: Record<string, any>
-): Promise<ApiResponse<Record<string, any>>> {
+  entityTable: string,
+  options: {
+    limit?: number;
+    offset?: number;
+    filters?: ExtensionFieldsFilter[];
+    sorters?: ExtensionFieldsSorter[];
+  } = {}
+): Promise<ApiResponse<{ data: EntityWithExtensions[]; total: number }>> {
   try {
-    // Add timestamps
-    const entityData = {
-      ...data,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+    const result = await getEntitiesWithExtensionsFromModule(tenantId, entityTable, options);
+
+    return {
+      data: result,
+      message: `Retrieved ${result.data.length} ${entityTable} entities with extensions`,
     };
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : 'Failed to fetch entities with extensions',
+      message: 'Failed to fetch entities with extensions',
+    };
+  }
+}
 
-    const entity = await createResource<ContentEntity>(tenantId, entityType, entityData);
-
-    if (!entity) {
-      return {
-        error: 'Failed to create entity',
-        message: 'Entity creation failed',
-      };
-    }
+/**
+ * Create entity with extensible fields
+ */
+export async function createEntityWithExtensions(
+  tenantId: string,
+  entityTable: string,
+  entityData: Record<string, any>,
+  extensionFields: ExtensionFieldValue
+): Promise<ApiResponse<EntityWithExtensions>> {
+  try {
+    const entity = await createEntityWithExtensionsFromModule(
+      tenantId,
+      entityTable,
+      entityData,
+      extensionFields
+    );
 
     return {
       data: entity,
-      message: 'Entity created successfully',
+      message: `Created ${entityTable} entity with extensions`,
     };
   } catch (error) {
     return {
-      error: error instanceof Error ? error.message : 'Failed to create entity',
-      message: 'Entity creation failed',
+      error: error instanceof Error ? error.message : 'Failed to create entity with extensions',
+      message: 'Failed to create entity with extensions',
     };
   }
 }
 
 /**
- * Update existing entity
+ * Update entity with extensible fields
  */
-export async function updateExistingEntity(
+export async function updateEntityWithExtensions(
   tenantId: string,
-  entityType: string,
+  entityTable: string,
   entityId: string,
-  data: Record<string, any>
-): Promise<ApiResponse<Record<string, any>>> {
+  entityData: Record<string, any>,
+  extensionFields?: ExtensionFieldValue
+): Promise<ApiResponse<EntityWithExtensions>> {
   try {
-    // Add update timestamp
-    const updateData = {
-      ...data,
-      updated_at: new Date().toISOString(),
-    };
-
-    const entity = await updateResource<ContentEntity>(tenantId, entityType, entityId, updateData);
+    const entity = await updateEntityWithExtensionsFromModule(
+      tenantId,
+      entityTable,
+      entityId,
+      entityData,
+      extensionFields
+    );
 
     if (!entity) {
       return {
-        error: 'Failed to update entity',
-        message: 'Entity update failed',
+        error: `Entity with id ${entityId} not found in ${entityTable}`,
+        message: 'Entity not found',
       };
     }
 
     return {
       data: entity,
-      message: 'Entity updated successfully',
+      message: `Updated ${entityTable} entity with extensions`,
     };
   } catch (error) {
     return {
-      error: error instanceof Error ? error.message : 'Failed to update entity',
-      message: 'Entity update failed',
+      error: error instanceof Error ? error.message : 'Failed to update entity with extensions',
+      message: 'Failed to update entity with extensions',
     };
   }
 }
 
 /**
- * Delete entity by ID
+ * Delete entity
  */
-export async function deleteExistingEntity(
+export async function deleteEntity(
   tenantId: string,
-  entityType: string,
+  entityTable: string,
   entityId: string
 ): Promise<ApiResponse<boolean>> {
   try {
-    const success = await deleteResource(tenantId, entityType, entityId);
+    // Get adapter for tenant database
+    const registry = getConnectorRegistry();
+    const adapter = await registry.getAdapter(tenantId, entityTable);
+
+    // Delete the entity
+    const success = await adapter.delete(entityId);
+
+    if (!success) {
+      return {
+        error: `Entity with id ${entityId} not found in ${entityTable}`,
+        message: 'Entity not found',
+      };
+    }
 
     return {
       data: success,
-      message: success ? 'Entity deleted successfully' : 'Entity deletion failed',
+      message: `Deleted ${entityTable} entity`,
     };
   } catch (error) {
     return {
       error: error instanceof Error ? error.message : 'Failed to delete entity',
-      message: 'Entity deletion failed',
+      message: 'Failed to delete entity',
     };
   }
 }
 
 /**
- * Upsert entity (create or update)
- * For now, this is a simple implementation that tries to update first, then create
- * TODO: Implement proper upsert in ResourceResolver
+ * Get field definitions for entity (proxy to Tenant Management Service)
  */
-export async function upsertExistingEntity(
+export async function getFieldDefinitionsForEntity(
   tenantId: string,
-  entityType: string,
-  data: Record<string, any>,
-  conflictColumns?: string[]
-): Promise<ApiResponse<Record<string, any>>> {
+  entityTable: string
+): Promise<ApiResponse<any[]>> {
   try {
-    // For now, we'll try to find existing entity by ID or other unique fields
-    const uniqueField = conflictColumns?.[0] || 'id';
-    const uniqueValue = data[uniqueField];
+    // TODO: Replace with actual RPC call to Tenant Management Service
+    // const response = await tenantManagementClient.getFieldDefinitions({ tenantId, entityTable });
 
-    if (uniqueValue) {
-      // Try to find existing entity
-      const existingEntities = await queryResource<ContentEntity>(tenantId, entityType, {
-        filter: { [uniqueField]: uniqueValue },
-        limit: 1,
-      });
+    console.log(
+      `[ContentService] Loading field definitions for ${tenantId}:${entityTable} from Tenant Management Service`
+    );
 
-      if (existingEntities && existingEntities.length > 0) {
-        // Update existing
-        const existingId = existingEntities[0]?.id;
-        if (existingId) {
-          return updateExistingEntity(tenantId, entityType, existingId, data);
-        }
-      }
-    }
-
-    // Create new
-    return createNewEntity(tenantId, entityType, data);
-  } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : 'Failed to upsert entity',
-      message: 'Entity upsert failed',
-    };
-  }
-}
-
-/**
- * Get entity count with optional filter
- */
-export async function getEntityCount(
-  tenantId: string,
-  entityType: string,
-  filter?: Record<string, any>
-): Promise<ApiResponse<number>> {
-  try {
-    const count = await countResources(tenantId, entityType, filter);
+    // Temporary stub - in reality will be RPC call
+    const definitions: any[] = [];
 
     return {
-      data: count,
-      message: 'Entity count retrieved successfully',
+      data: definitions,
+      message: `Retrieved field definitions for ${entityTable}`,
     };
   } catch (error) {
     return {
-      error: error instanceof Error ? error.message : 'Failed to count entities',
-      message: 'Failed to count entities',
+      error: error instanceof Error ? error.message : 'Failed to fetch field definitions',
+      message: 'Failed to fetch field definitions',
     };
   }
 }
 
 /**
- * Search entities with advanced filtering
+ * Validate extension fields
  */
-export async function searchEntities(
+export async function validateExtensionFields(
   tenantId: string,
-  entityType: string,
-  params: {
-    filter?: Record<string, any>;
-    limit?: number;
-    offset?: number;
-    orderBy?: Array<{ field: string; direction: 'asc' | 'desc' }>;
-  }
-): Promise<ApiResponse<Record<string, any>[]>> {
+  entityTable: string,
+  extensionFields: ExtensionFieldValue
+): Promise<ApiResponse<{ isValid: boolean; errors: string[] }>> {
   try {
-    const { filter, limit = 100, offset = 0, orderBy } = params;
+    // Get field definitions from Tenant Management Service
+    const definitionsResponse = await getFieldDefinitionsForEntity(tenantId, entityTable);
 
-    const entities = await queryResource<ContentEntity>(tenantId, entityType, {
-      filter,
-      limit,
-      offset,
-      orderBy: orderBy || [{ field: 'created_at', direction: 'desc' }],
-    });
-
-    return {
-      data: entities,
-      message: `Found ${entities.length} ${entityType} entities`,
-    };
-  } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : 'Failed to search entities',
-      message: 'Failed to search entities',
-    };
-  }
-}
-
-/**
- * Get paginated entities with metadata
- */
-export async function getPaginatedEntities(
-  tenantId: string,
-  entityType: string,
-  params: {
-    limit?: number;
-    offset?: number;
-    filter?: Record<string, any>;
-    orderBy?: Array<{ field: string; direction: 'asc' | 'desc' }>;
-  }
-): Promise<
-  ApiResponse<{
-    entities: ContentEntity[];
-    total: number;
-    limit: number;
-    offset: number;
-    hasMore: boolean;
-  }>
-> {
-  try {
-    const { limit = 100, offset = 0, filter, orderBy } = params;
-
-    const [entities, total] = await Promise.all([
-      queryResource<ContentEntity>(tenantId, entityType, {
-        filter,
-        limit,
-        offset,
-        orderBy: orderBy || [{ field: 'created_at', direction: 'desc' }],
-      }),
-      countResources(tenantId, entityType, filter),
-    ]);
-
-    const hasMore = offset + limit < total;
-
-    return {
-      data: {
-        entities,
-        total,
-        limit,
-        offset,
-        hasMore,
-      },
-      message: 'Paginated entities retrieved successfully',
-    };
-  } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : 'Failed to fetch paginated entities',
-      message: 'Failed to fetch paginated entities',
-    };
-  }
-}
-
-/**
- * Bulk operations for entities
- */
-export async function bulkCreateEntities(
-  tenantId: string,
-  entityType: string,
-  entities: Record<string, any>[]
-): Promise<ApiResponse<Record<string, any>[]>> {
-  try {
-    const timestamp = new Date().toISOString();
-    const results: ContentEntity[] = [];
-
-    // Process in batches to avoid overwhelming the database
-    for (const entityData of entities) {
-      const data = {
-        ...entityData,
-        created_at: timestamp,
-        updated_at: timestamp,
+    if (definitionsResponse.error) {
+      return {
+        error: definitionsResponse.error,
+        message: 'Failed to validate extension fields',
       };
-
-      const entity = await createResource<ContentEntity>(tenantId, entityType, data);
-      if (entity) {
-        results.push(entity);
-      }
     }
 
+    const fieldDefinitions = definitionsResponse.data || [];
+
+    // Validate using parseExtensionFieldValues (will throw on validation errors)
+    try {
+      parseExtensionFieldValues(extensionFields, fieldDefinitions);
+
+      return {
+        data: { isValid: true, errors: [] },
+        message: 'Extension fields are valid',
+      };
+    } catch (validationError) {
+      return {
+        data: {
+          isValid: false,
+          errors: [
+            validationError instanceof Error ? validationError.message : 'Validation failed',
+          ],
+        },
+        message: 'Extension fields validation failed',
+      };
+    }
+  } catch (error) {
     return {
-      data: results,
-      message: `Successfully created ${results.length} out of ${entities.length} entities`,
+      error: error instanceof Error ? error.message : 'Failed to validate extension fields',
+      message: 'Failed to validate extension fields',
+    };
+  }
+}
+
+/**
+ * Get cache statistics
+ */
+export function getCacheStats(): ApiResponse<{
+  fieldDefinitionsCache: { size: number; entries: string[] };
+}> {
+  try {
+    const fieldDefinitionsCache = getFieldDefinitionsCacheStats();
+
+    return {
+      data: { fieldDefinitionsCache },
+      message: 'Cache statistics retrieved',
     };
   } catch (error) {
     return {
-      error: error instanceof Error ? error.message : 'Failed to bulk create entities',
-      message: 'Bulk creation failed',
+      error: error instanceof Error ? error.message : 'Failed to get cache statistics',
+      message: 'Failed to get cache statistics',
+    };
+  }
+}
+
+/**
+ * Invalidate cache
+ */
+export function invalidateCache(tenantId?: string, entityTable?: string): ApiResponse<boolean> {
+  try {
+    invalidateFieldDefinitionsCache(tenantId, entityTable);
+
+    return {
+      data: true,
+      message:
+        tenantId && entityTable
+          ? `Cache invalidated for ${tenantId}:${entityTable}`
+          : tenantId
+          ? `Cache invalidated for tenant ${tenantId}`
+          : 'All cache invalidated',
+    };
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : 'Failed to invalidate cache',
+      message: 'Failed to invalidate cache',
     };
   }
 }

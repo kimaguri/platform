@@ -4,159 +4,443 @@ import type { AuthData } from '../../gateway/auth';
 import type { ApiResponse } from '../../lib/types';
 import * as ContentService from './service';
 
+// Import types for extensible fields
+import type {
+  EntityWithExtensions,
+  ExtensionFieldsFilter,
+  ExtensionFieldsSorter,
+  ExtensionFieldValue,
+} from './src/extensible-fields';
+
 /**
  * Content Management API Endpoints
- * RPC endpoints called internally by API Gateway
+ * Universal RPC endpoints for entities with extensible fields
  * Functional approach - no classes, only pure functions
  */
 
 /**
- * List entities with pagination
+ * Health check for content management service
  */
-export const listEntities = api(
-  { auth: true, method: 'GET', path: '/entities/:entity' },
+export const healthCheck = api(
+  { auth: false, method: 'GET', path: '/content/health' },
+  async (): Promise<ApiResponse<{ status: string; timestamp: string }>> => {
+    return ContentService.performHealthCheck();
+  }
+);
+
+// ===== EXTENSIBLE FIELDS ENDPOINTS =====
+
+/**
+ * Универсальный эндпоинт для получения сущности с расширяемыми полями
+ * Поддерживает все сущности: users, leads, clients, projects, activities, employee
+ */
+export const getEntityWithExtensions = api(
+  { auth: true, method: 'GET', path: '/content/:entityTable/:entityId' },
   async ({
-    entity,
+    entityTable,
+    entityId,
+  }: {
+    entityTable: string;
+    entityId: string;
+  }): Promise<ApiResponse<EntityWithExtensions>> => {
+    const authData = getAuthData() as AuthData;
+    return ContentService.getEntityWithExtensions(authData.tenantId, entityTable, entityId);
+  }
+);
+
+/**
+ * Универсальный эндпоинт для получения списка сущностей с расширяемыми полями
+ * Поддерживает пагинацию, фильтрацию и сортировку по базовым и расширяемым полям
+ */
+export const getEntitiesWithExtensions = api(
+  { auth: true, method: 'GET', path: '/content/:entityTable' },
+  async ({
+    entityTable,
     limit,
     offset,
+    filters,
+    sorters,
   }: {
-    entity: string;
+    entityTable: string;
     limit?: Query<number>;
     offset?: Query<number>;
-  }): Promise<ApiResponse<Record<string, any>[]>> => {
+    filters?: Query<string>; // JSON string with ExtensionFieldsFilter[]
+    sorters?: Query<string>; // JSON string with ExtensionFieldsSorter[]
+  }): Promise<
+    ApiResponse<{
+      data: EntityWithExtensions[];
+      total: number;
+      pagination: { limit: number; offset: number; hasMore: boolean };
+    }>
+  > => {
     const authData = getAuthData() as AuthData;
-    return ContentService.getEntityList(authData.tenantId, entity, {
-      limit: limit || 100,
+
+    // Парсим фильтры и сортировку из JSON строк
+    let parsedFilters: ExtensionFieldsFilter[] = [];
+    let parsedSorters: ExtensionFieldsSorter[] = [];
+
+    try {
+      if (filters) {
+        parsedFilters = JSON.parse(filters);
+      }
+      if (sorters) {
+        parsedSorters = JSON.parse(sorters);
+      }
+    } catch (error) {
+      return {
+        error: 'Invalid filters or sorters format. Expected JSON string.',
+        message: 'Invalid query parameters',
+      };
+    }
+
+    const result = await ContentService.getEntitiesWithExtensions(authData.tenantId, entityTable, {
+      limit: limit || 50,
       offset: offset || 0,
+      filters: parsedFilters,
+      sorters: parsedSorters,
     });
+
+    if (result.error) {
+      return result;
+    }
+
+    // Добавляем информацию о пагинации
+    const pagination = {
+      limit: limit || 50,
+      offset: offset || 0,
+      hasMore: (offset || 0) + (limit || 50) < result.data!.total,
+    };
+
+    return {
+      data: {
+        data: result.data!.data,
+        total: result.data!.total,
+        pagination,
+      },
+      message: `Retrieved ${result.data!.data.length} ${entityTable} entities with extensions`,
+    };
   }
 );
 
 /**
- * Get single entity by ID
+ * Создание сущности с расширяемыми полями
  */
-export const getEntity = api(
-  { auth: true, method: 'GET', path: '/entities/:entity/:id' },
+export const createEntityWithExtensions = api(
+  { auth: true, method: 'POST', path: '/content/:entityTable' },
   async ({
-    entity,
-    id,
+    entityTable,
+    entityData,
+    extensionFields,
   }: {
-    entity: string;
-    id: string;
-  }): Promise<ApiResponse<Record<string, any>>> => {
+    entityTable: string;
+    entityData: Record<string, any>;
+    extensionFields?: ExtensionFieldValue;
+  }): Promise<ApiResponse<EntityWithExtensions>> => {
     const authData = getAuthData() as AuthData;
-    return ContentService.getEntityById(authData.tenantId, entity, id);
+    return ContentService.createEntityWithExtensions(
+      authData.tenantId,
+      entityTable,
+      entityData,
+      extensionFields || {}
+    );
   }
 );
 
 /**
- * Create new entity
+ * Обновление сущности с расширяемыми полями
  */
-export const createEntity = api(
-  { auth: true, method: 'POST', path: '/entities/:entity' },
+export const updateEntityWithExtensions = api(
+  { auth: true, method: 'PUT', path: '/content/:entityTable/:entityId' },
   async ({
-    entity,
-    data,
+    entityTable,
+    entityId,
+    entityData,
+    extensionFields,
   }: {
-    entity: string;
-    data: Record<string, any>;
-  }): Promise<ApiResponse<Record<string, any>>> => {
+    entityTable: string;
+    entityId: string;
+    entityData?: Record<string, any>;
+    extensionFields?: ExtensionFieldValue;
+  }): Promise<ApiResponse<EntityWithExtensions>> => {
     const authData = getAuthData() as AuthData;
-    return ContentService.createNewEntity(authData.tenantId, entity, data);
+    return ContentService.updateEntityWithExtensions(
+      authData.tenantId,
+      entityTable,
+      entityId,
+      entityData || {},
+      extensionFields
+    );
   }
 );
 
 /**
- * Update existing entity
- */
-export const updateEntity = api(
-  { auth: true, method: 'PUT', path: '/entities/:entity/:id' },
-  async ({
-    entity,
-    id,
-    data,
-  }: {
-    entity: string;
-    id: string;
-    data: Record<string, any>;
-  }): Promise<ApiResponse<Record<string, any>>> => {
-    const authData = getAuthData() as AuthData;
-    return ContentService.updateExistingEntity(authData.tenantId, entity, id, data);
-  }
-);
-
-/**
- * Delete entity by ID
+ * Удаление сущности
  */
 export const deleteEntity = api(
-  { auth: true, method: 'DELETE', path: '/entities/:entity/:id' },
-  async ({ entity, id }: { entity: string; id: string }): Promise<ApiResponse<boolean>> => {
-    const authData = getAuthData() as AuthData;
-    return ContentService.deleteExistingEntity(authData.tenantId, entity, id);
-  }
-);
-
-/**
- * Upsert entity (create or update)
- */
-export const upsertEntity = api(
-  { auth: true, method: 'POST', path: '/entities/:entity/upsert' },
+  { auth: true, method: 'DELETE', path: '/content/:entityTable/:entityId' },
   async ({
-    entity,
-    data,
-    conflictColumns,
+    entityTable,
+    entityId,
   }: {
-    entity: string;
-    data: Record<string, any>;
-    conflictColumns?: string[];
-  }): Promise<ApiResponse<Record<string, any>>> => {
+    entityTable: string;
+    entityId: string;
+  }): Promise<ApiResponse<boolean>> => {
     const authData = getAuthData() as AuthData;
-    return ContentService.upsertExistingEntity(authData.tenantId, entity, data, conflictColumns);
+    return ContentService.deleteEntity(authData.tenantId, entityTable, entityId);
   }
 );
 
-/**
- * Count entities in table
- */
-export const countEntities = api(
-  { auth: true, method: 'GET', path: '/entities/:entity/count' },
-  async ({
-    entity,
-    filter,
-  }: {
-    entity: string;
-    filter?: Query<string>; // JSON string filter
-  }): Promise<ApiResponse<number>> => {
-    const authData = getAuthData() as AuthData;
-    const parsedFilter = filter ? JSON.parse(filter) : undefined;
-    return ContentService.getEntityCount(authData.tenantId, entity, parsedFilter);
-  }
-);
+// ===== ENTITY-SPECIFIC ENDPOINTS (для обратной совместимости) =====
 
 /**
- * Search entities with filter
+ * Получение пользователей с расширяемыми полями
  */
-export const searchEntities = api(
-  { auth: true, method: 'POST', path: '/entities/:entity/search' },
+export const getUsers = api(
+  { auth: true, method: 'GET', path: '/content/users/list' },
   async ({
-    entity,
-    filter,
     limit,
     offset,
-    orderBy,
+    filters,
+    sorters,
   }: {
-    entity: string;
-    filter?: Record<string, any>;
-    limit?: number;
-    offset?: number;
-    orderBy?: Array<{ field: string; direction: 'asc' | 'desc' }>;
-  }): Promise<ApiResponse<Record<string, any>[]>> => {
+    limit?: Query<number>;
+    offset?: Query<number>;
+    filters?: Query<string>;
+    sorters?: Query<string>;
+  }): Promise<
+    ApiResponse<{
+      data: EntityWithExtensions[];
+      total: number;
+      pagination: { limit: number; offset: number; hasMore: boolean };
+    }>
+  > => {
     const authData = getAuthData() as AuthData;
-    return ContentService.searchEntities(authData.tenantId, entity, {
-      filter,
-      limit: limit || 100,
+
+    let parsedFilters: ExtensionFieldsFilter[] = [];
+    let parsedSorters: ExtensionFieldsSorter[] = [];
+
+    try {
+      if (filters) parsedFilters = JSON.parse(filters);
+      if (sorters) parsedSorters = JSON.parse(sorters);
+    } catch (error) {
+      return {
+        error: 'Invalid filters or sorters format',
+        message: 'Invalid query parameters',
+      };
+    }
+
+    const result = await ContentService.getEntitiesWithExtensions(authData.tenantId, 'users', {
+      limit: limit || 50,
       offset: offset || 0,
-      orderBy,
+      filters: parsedFilters,
+      sorters: parsedSorters,
     });
+
+    if (result.error) {
+      return result;
+    }
+
+    const pagination = {
+      limit: limit || 50,
+      offset: offset || 0,
+      hasMore: (offset || 0) + (limit || 50) < result.data!.total,
+    };
+
+    return {
+      data: {
+        data: result.data!.data,
+        total: result.data!.total,
+        pagination,
+      },
+      message: `Retrieved ${result.data!.data.length} users with extensions`,
+    };
+  }
+);
+
+/**
+ * Получение лидов с расширяемыми полями
+ */
+export const getLeads = api(
+  { auth: true, method: 'GET', path: '/content/leads/list' },
+  async ({
+    limit,
+    offset,
+    filters,
+    sorters,
+  }: {
+    limit?: Query<number>;
+    offset?: Query<number>;
+    filters?: Query<string>;
+    sorters?: Query<string>;
+  }): Promise<
+    ApiResponse<{
+      data: EntityWithExtensions[];
+      total: number;
+      pagination: { limit: number; offset: number; hasMore: boolean };
+    }>
+  > => {
+    const authData = getAuthData() as AuthData;
+
+    let parsedFilters: ExtensionFieldsFilter[] = [];
+    let parsedSorters: ExtensionFieldsSorter[] = [];
+
+    try {
+      if (filters) parsedFilters = JSON.parse(filters);
+      if (sorters) parsedSorters = JSON.parse(sorters);
+    } catch (error) {
+      return {
+        error: 'Invalid filters or sorters format',
+        message: 'Invalid query parameters',
+      };
+    }
+
+    const result = await ContentService.getEntitiesWithExtensions(authData.tenantId, 'leads', {
+      limit: limit || 50,
+      offset: offset || 0,
+      filters: parsedFilters,
+      sorters: parsedSorters,
+    });
+
+    if (result.error) {
+      return result;
+    }
+
+    const pagination = {
+      limit: limit || 50,
+      offset: offset || 0,
+      hasMore: (offset || 0) + (limit || 50) < result.data!.total,
+    };
+
+    return {
+      data: {
+        data: result.data!.data,
+        total: result.data!.total,
+        pagination,
+      },
+      message: `Retrieved ${result.data!.data.length} leads with extensions`,
+    };
+  }
+);
+
+/**
+ * Получение проектов с расширяемыми полями
+ */
+export const getProjects = api(
+  { auth: true, method: 'GET', path: '/content/projects/list' },
+  async ({
+    limit,
+    offset,
+    filters,
+    sorters,
+  }: {
+    limit?: Query<number>;
+    offset?: Query<number>;
+    filters?: Query<string>;
+    sorters?: Query<string>;
+  }): Promise<
+    ApiResponse<{
+      data: EntityWithExtensions[];
+      total: number;
+      pagination: { limit: number; offset: number; hasMore: boolean };
+    }>
+  > => {
+    const authData = getAuthData() as AuthData;
+
+    let parsedFilters: ExtensionFieldsFilter[] = [];
+    let parsedSorters: ExtensionFieldsSorter[] = [];
+
+    try {
+      if (filters) parsedFilters = JSON.parse(filters);
+      if (sorters) parsedSorters = JSON.parse(sorters);
+    } catch (error) {
+      return {
+        error: 'Invalid filters or sorters format',
+        message: 'Invalid query parameters',
+      };
+    }
+
+    const result = await ContentService.getEntitiesWithExtensions(authData.tenantId, 'projects', {
+      limit: limit || 50,
+      offset: offset || 0,
+      filters: parsedFilters,
+      sorters: parsedSorters,
+    });
+
+    if (result.error) {
+      return result;
+    }
+
+    const pagination = {
+      limit: limit || 50,
+      offset: offset || 0,
+      hasMore: (offset || 0) + (limit || 50) < result.data!.total,
+    };
+
+    return {
+      data: {
+        data: result.data!.data,
+        total: result.data!.total,
+        pagination,
+      },
+      message: `Retrieved ${result.data!.data.length} projects with extensions`,
+    };
+  }
+);
+
+// ===== UTILITY ENDPOINTS =====
+
+/**
+ * Получение определений полей для сущности (прокси к Tenant Management Service)
+ */
+export const getFieldDefinitions = api(
+  { auth: true, method: 'GET', path: '/content/:entityTable/field-definitions' },
+  async ({ entityTable }: { entityTable: string }): Promise<ApiResponse<any[]>> => {
+    const authData = getAuthData() as AuthData;
+    return ContentService.getFieldDefinitionsForEntity(authData.tenantId, entityTable);
+  }
+);
+
+/**
+ * Валидация данных расширяемых полей
+ */
+export const validateExtensionFields = api(
+  { auth: true, method: 'POST', path: '/content/:entityTable/validate-extensions' },
+  async ({
+    entityTable,
+    extensionFields,
+  }: {
+    entityTable: string;
+    extensionFields: ExtensionFieldValue;
+  }): Promise<ApiResponse<{ isValid: boolean; errors: string[] }>> => {
+    const authData = getAuthData() as AuthData;
+    return ContentService.validateExtensionFields(authData.tenantId, entityTable, extensionFields);
+  }
+);
+
+/**
+ * Получение статистики кеша расширяемых полей
+ */
+export const getCacheStats = api(
+  { auth: true, method: 'GET', path: '/content/cache/stats' },
+  async (): Promise<
+    ApiResponse<{ fieldDefinitionsCache: { size: number; entries: string[] } }>
+  > => {
+    return ContentService.getCacheStats();
+  }
+);
+
+/**
+ * Инвалидация кеша расширяемых полей
+ */
+export const invalidateCache = api(
+  { auth: true, method: 'POST', path: '/content/cache/invalidate' },
+  async ({
+    tenantId,
+    entityTable,
+  }: {
+    tenantId?: string;
+    entityTable?: string;
+  }): Promise<ApiResponse<boolean>> => {
+    return ContentService.invalidateCache(tenantId, entityTable);
   }
 );

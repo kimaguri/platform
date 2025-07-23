@@ -15,10 +15,22 @@ import {
   createTenant as createTenantInDb,
   updateTenant as updateTenantInDb,
   deactivateTenant as deactivateTenantInDb,
-  createSupabaseConfig,
+  createSupabaseConfig as createSupabaseConfigInDb,
   checkAdminConnection,
 } from '../../lib/adminDb/client';
 import { clearConfigCache } from '../../lib/config/tenantConfig';
+
+// Import extensible fields functions
+import {
+  getFieldDefinitionsForTenant as getFieldDefinitionsFromAdmin,
+  getAllFieldDefinitionsForTenant as getAllFieldDefinitionsFromAdmin,
+  createFieldDefinition as createFieldDefinitionInAdmin,
+  updateFieldDefinition as updateFieldDefinitionInAdmin,
+  deleteFieldDefinition as deleteFieldDefinitionInAdmin,
+  getExtensibleFieldsStats as getExtensibleFieldsStatsFromAdmin,
+  SUPPORTED_ENTITIES,
+  type ExtensionFieldDefinition,
+} from './src/extensible-fields';
 
 /**
  * Tenant Management Business Logic
@@ -56,7 +68,7 @@ export async function getTenantList(params: {
 }
 
 /**
- * Get tenant by ID with full information
+ * Get single tenant by ID
  */
 export async function getTenantById(tenantId: string): Promise<ApiResponse<TenantFullInfo>> {
   try {
@@ -64,14 +76,14 @@ export async function getTenantById(tenantId: string): Promise<ApiResponse<Tenan
 
     if (!tenant) {
       return {
-        error: 'Tenant not found',
+        error: `Tenant with id ${tenantId} not found`,
         message: 'Tenant not found',
       };
     }
 
     return {
       data: tenant,
-      message: 'Tenant retrieved successfully',
+      message: `Retrieved tenant ${tenantId}`,
     };
   } catch (error) {
     return {
@@ -84,11 +96,9 @@ export async function getTenantById(tenantId: string): Promise<ApiResponse<Tenan
 /**
  * Create new tenant
  */
-export async function createNewTenant(
-  createData: CreateTenantRequest
-): Promise<ApiResponse<Tenant>> {
+export async function createTenant(data: CreateTenantRequest): Promise<ApiResponse<Tenant>> {
   try {
-    const tenant = await createTenantInDb(createData);
+    const tenant = await createTenantInDb(data);
 
     if (!tenant) {
       return {
@@ -97,17 +107,17 @@ export async function createNewTenant(
       };
     }
 
-    // Clear config cache after creation
+    // Clear config cache to ensure fresh data
     clearConfigCache();
 
     return {
       data: tenant,
-      message: 'Tenant created successfully',
+      message: `Created tenant ${tenant.name}`,
     };
   } catch (error) {
     return {
       error: error instanceof Error ? error.message : 'Failed to create tenant',
-      message: 'Tenant creation failed',
+      message: 'Failed to create tenant',
     };
   }
 }
@@ -115,37 +125,37 @@ export async function createNewTenant(
 /**
  * Update existing tenant
  */
-export async function updateExistingTenant(
+export async function updateTenant(
   tenantId: string,
-  updateData: UpdateTenantRequest
+  data: UpdateTenantRequest
 ): Promise<ApiResponse<Tenant>> {
   try {
-    const tenant = await updateTenantInDb(tenantId, updateData);
+    const tenant = await updateTenantInDb(tenantId, data);
 
     if (!tenant) {
       return {
-        error: 'Failed to update tenant',
-        message: 'Tenant update failed',
+        error: `Tenant with id ${tenantId} not found`,
+        message: 'Tenant not found',
       };
     }
 
-    // Clear config cache after update
+    // Clear config cache to ensure fresh data
     clearConfigCache();
 
     return {
       data: tenant,
-      message: 'Tenant updated successfully',
+      message: `Updated tenant ${tenantId}`,
     };
   } catch (error) {
     return {
       error: error instanceof Error ? error.message : 'Failed to update tenant',
-      message: 'Tenant update failed',
+      message: 'Failed to update tenant',
     };
   }
 }
 
 /**
- * Deactivate tenant (soft delete)
+ * Deactivate tenant
  */
 export async function deactivateTenant(tenantId: string): Promise<ApiResponse<boolean>> {
   try {
@@ -153,22 +163,61 @@ export async function deactivateTenant(tenantId: string): Promise<ApiResponse<bo
 
     if (!success) {
       return {
-        error: 'Failed to deactivate tenant',
+        error: `Failed to deactivate tenant ${tenantId}`,
         message: 'Tenant deactivation failed',
       };
     }
 
-    // Clear config cache after deactivation
+    // Clear config cache to ensure fresh data
     clearConfigCache();
 
     return {
-      data: true,
-      message: 'Tenant deactivated successfully',
+      data: success,
+      message: `Deactivated tenant ${tenantId}`,
     };
   } catch (error) {
     return {
       error: error instanceof Error ? error.message : 'Failed to deactivate tenant',
-      message: 'Tenant deactivation failed',
+      message: 'Failed to deactivate tenant',
+    };
+  }
+}
+
+/**
+ * Create Supabase configuration for tenant
+ */
+export async function createSupabaseConfig(
+  tenantId: string,
+  data: CreateSupabaseConfigRequest
+): Promise<ApiResponse<TenantConfig>> {
+  try {
+    const config = await createSupabaseConfigInDb(data);
+
+    if (!config) {
+      return {
+        error: 'Failed to create Supabase configuration',
+        message: 'Configuration creation failed',
+      };
+    }
+
+    // Clear config cache to ensure fresh data
+    clearConfigCache();
+
+    // Convert to TenantConfig format
+    const tenantConfig: TenantConfig = {
+      SUPABASE_URL: config.supabase_url,
+      ANON_KEY: config.anon_key,
+      SERVICE_KEY: config.service_key,
+    };
+
+    return {
+      data: tenantConfig,
+      message: `Created Supabase configuration for tenant ${tenantId}`,
+    };
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : 'Failed to create Supabase configuration',
+      message: 'Failed to create Supabase configuration',
     };
   }
 }
@@ -212,62 +261,153 @@ export async function getTenantConfiguration(tenantId: string): Promise<ApiRespo
   }
 }
 
+// ===== EXTENSIBLE FIELDS FUNCTIONS =====
+
 /**
- * Create tenant Supabase configuration
+ * Get field definitions for tenant and entity
  */
-export async function createTenantConfiguration(
+export async function getFieldDefinitionsForTenant(
   tenantId: string,
-  configData: {
-    supabase_project_id: string;
-    supabase_url: string;
-    supabase_anon_key: string;
-    supabase_service_key: string;
-    region?: string;
-    plan?: 'free' | 'pro' | 'team' | 'enterprise';
-  }
-): Promise<ApiResponse<TenantConfig>> {
+  entityTable: string
+): Promise<ApiResponse<ExtensionFieldDefinition[]>> {
   try {
-    const config = await createSupabaseConfig({
-      tenant_id: tenantId,
-      supabase_project_id: configData.supabase_project_id,
-      supabase_url: configData.supabase_url,
-      anon_key: configData.supabase_anon_key,
-      service_key: configData.supabase_service_key,
-      region: configData.region,
-      plan: configData.plan,
-    });
-
-    if (!config) {
-      return {
-        error: 'Failed to create Supabase configuration',
-        message: 'Configuration creation failed',
-      };
-    }
-
-    // Clear config cache after creation
-    clearConfigCache();
-
-    // Convert TenantSupabaseConfig to TenantConfig
-    const tenantConfig: TenantConfig = {
-      id: config.id,
-      tenant_id: config.tenant_id,
-      supabase_url: config.supabase_url,
-      supabase_anon_key: config.anon_key,
-      supabase_service_key: config.service_key,
-      created_at: config.created_at,
-      updated_at: config.updated_at,
-    };
+    const definitions = await getFieldDefinitionsFromAdmin(tenantId, entityTable);
 
     return {
-      data: tenantConfig,
-      message: 'Supabase configuration created successfully',
+      data: definitions,
+      message: `Retrieved ${definitions.length} field definitions for ${tenantId}:${entityTable}`,
     };
   } catch (error) {
     return {
-      error: error instanceof Error ? error.message : 'Failed to create configuration',
-      message: 'Configuration creation failed',
+      error: error instanceof Error ? error.message : 'Failed to fetch field definitions',
+      message: 'Failed to fetch field definitions',
     };
   }
+}
+
+/**
+ * Get all field definitions for tenant
+ */
+export async function getAllFieldDefinitionsForTenant(
+  tenantId: string
+): Promise<ApiResponse<Record<string, ExtensionFieldDefinition[]>>> {
+  try {
+    const definitions = await getAllFieldDefinitionsFromAdmin(tenantId);
+
+    const totalFields = Object.values(definitions).reduce((sum, fields) => sum + fields.length, 0);
+
+    return {
+      data: definitions,
+      message: `Retrieved ${totalFields} field definitions across ${
+        Object.keys(definitions).length
+      } entities for tenant ${tenantId}`,
+    };
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : 'Failed to fetch field definitions',
+      message: 'Failed to fetch field definitions',
+    };
+  }
+}
+
+/**
+ * Create field definition
+ */
+export async function createFieldDefinition(
+  tenantId: string,
+  fieldDefinition: Omit<ExtensionFieldDefinition, 'id' | 'tenant_id' | 'created_at' | 'updated_at'>
+): Promise<ApiResponse<ExtensionFieldDefinition>> {
+  try {
+    const definition = await createFieldDefinitionInAdmin(tenantId, fieldDefinition);
+
+    return {
+      data: definition,
+      message: `Created field definition '${definition.display_name}' for ${tenantId}:${definition.entity_table}`,
+    };
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : 'Failed to create field definition',
+      message: 'Failed to create field definition',
+    };
+  }
+}
+
+/**
+ * Update field definition
+ */
+export async function updateFieldDefinition(
+  fieldId: number,
+  updates: Partial<Omit<ExtensionFieldDefinition, 'id' | 'tenant_id' | 'created_at' | 'updated_at'>>
+): Promise<ApiResponse<ExtensionFieldDefinition>> {
+  try {
+    const definition = await updateFieldDefinitionInAdmin(fieldId, updates);
+
+    return {
+      data: definition,
+      message: `Updated field definition '${definition.display_name}'`,
+    };
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : 'Failed to update field definition',
+      message: 'Failed to update field definition',
+    };
+  }
+}
+
+/**
+ * Delete field definition
+ */
+export async function deleteFieldDefinition(fieldId: number): Promise<ApiResponse<boolean>> {
+  try {
+    await deleteFieldDefinitionInAdmin(fieldId);
+
+    return {
+      data: true,
+      message: `Deleted field definition ${fieldId}`,
+    };
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : 'Failed to delete field definition',
+      message: 'Failed to delete field definition',
+    };
+  }
+}
+
+/**
+ * Get extensible fields statistics
+ */
+export async function getExtensibleFieldsStats(): Promise<
+  ApiResponse<{
+    totalTenants: number;
+    totalFields: number;
+    fieldsByTenant: Record<string, number>;
+    fieldsByEntity: Record<string, number>;
+  }>
+> {
+  try {
+    const stats = await getExtensibleFieldsStatsFromAdmin();
+
+    return {
+      data: stats,
+      message: `Retrieved extensible fields statistics: ${stats.totalFields} fields across ${stats.totalTenants} tenants`,
+    };
+  } catch (error) {
+    return {
+      error:
+        error instanceof Error ? error.message : 'Failed to fetch extensible fields statistics',
+      message: 'Failed to fetch extensible fields statistics',
+    };
+  }
+}
+
+/**
+ * Get supported entities for extensible fields
+ */
+export function getSupportedEntities(): ApiResponse<string[]> {
+  return {
+    data: [...SUPPORTED_ENTITIES],
+    message: `${SUPPORTED_ENTITIES.length} entities support extensible fields`,
+  };
 }
 
 /**

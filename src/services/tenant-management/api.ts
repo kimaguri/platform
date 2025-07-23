@@ -10,6 +10,7 @@ import type {
   CreateSupabaseConfigRequest,
   TenantConfig,
 } from './src/models/tenant';
+import type { ExtensionFieldDefinition } from './src/extensible-fields';
 import * as TenantService from './service';
 
 /**
@@ -50,34 +51,37 @@ export const getTenant = api(
 );
 
 /**
- * Create new tenant (admin only)
+ * Create new tenant
  */
 export const createTenant = api(
-  { auth: true, method: 'POST', path: '/tenants' },
-  async (createData: CreateTenantRequest): Promise<ApiResponse<Tenant>> => {
+  { auth: true, method: 'POST', path: '/tenants/create' },
+  async ({ data }: { data: CreateTenantRequest }): Promise<ApiResponse<Tenant>> => {
     const authData = getAuthData() as AuthData;
-    return TenantService.createNewTenant(createData);
+    return TenantService.createTenant(data);
   }
 );
 
 /**
- * Update existing tenant (admin only)
+ * Update tenant
  */
 export const updateTenant = api(
   { auth: true, method: 'PUT', path: '/tenants/:tenantId' },
   async ({
     tenantId,
-    ...updateData
-  }: UpdateTenantRequest & { tenantId: string }): Promise<ApiResponse<Tenant>> => {
+    data,
+  }: {
+    tenantId: string;
+    data: UpdateTenantRequest;
+  }): Promise<ApiResponse<Tenant>> => {
     const authData = getAuthData() as AuthData;
-    return TenantService.updateExistingTenant(tenantId, updateData);
+    return TenantService.updateTenant(tenantId, data);
   }
 );
 
 /**
- * Delete/deactivate tenant (admin only)
+ * Deactivate tenant
  */
-export const deleteTenant = api(
+export const deactivateTenant = api(
   { auth: true, method: 'DELETE', path: '/tenants/:tenantId' },
   async ({ tenantId }: { tenantId: string }): Promise<ApiResponse<boolean>> => {
     const authData = getAuthData() as AuthData;
@@ -86,44 +90,131 @@ export const deleteTenant = api(
 );
 
 /**
- * Get tenant configuration
+ * Create Supabase configuration for tenant
  */
-export const getTenantConfig = api(
-  { auth: true, method: 'GET', path: '/tenants/:tenantId/config' },
-  async ({ tenantId }: { tenantId: string }): Promise<ApiResponse<TenantConfig>> => {
-    const authData = getAuthData() as AuthData;
-    return TenantService.getTenantConfiguration(tenantId);
-  }
-);
-
-/**
- * Create tenant Supabase configuration (admin only)
- */
-export const createTenantConfig = api(
-  { auth: true, method: 'POST', path: '/tenants/:tenantId/config' },
+export const createSupabaseConfig = api(
+  { auth: true, method: 'POST', path: '/tenants/:tenantId/supabase-config' },
   async ({
     tenantId,
-    ...configData
+    data,
   }: {
     tenantId: string;
-    supabase_project_id: string;
-    supabase_url: string;
-    supabase_anon_key: string;
-    supabase_service_key: string;
-    region?: string;
-    plan?: 'free' | 'pro' | 'team' | 'enterprise';
+    data: CreateSupabaseConfigRequest;
   }): Promise<ApiResponse<TenantConfig>> => {
     const authData = getAuthData() as AuthData;
-    return TenantService.createTenantConfiguration(tenantId, configData);
+    return TenantService.createSupabaseConfig(tenantId, data);
+  }
+);
+
+// ===== EXTENSIBLE FIELDS ENDPOINTS =====
+
+/**
+ * Получение определений полей для тенанта и сущности
+ * Используется Content Management Service для получения метаданных
+ */
+export const getFieldDefinitions = api(
+  { auth: true, method: 'GET', path: '/tenants/:tenantId/fields/:entityTable' },
+  async ({
+    tenantId,
+    entityTable,
+  }: {
+    tenantId: string;
+    entityTable: string;
+  }): Promise<ApiResponse<ExtensionFieldDefinition[]>> => {
+    const authData = getAuthData() as AuthData;
+    return TenantService.getFieldDefinitionsForTenant(tenantId, entityTable);
   }
 );
 
 /**
- * Health check for tenant management system
+ * Получение всех определений полей для тенанта
  */
-export const healthCheck = api(
-  { auth: false, method: 'GET', path: '/tenants/health' },
-  async (): Promise<ApiResponse<{ admin_db_connected: boolean; timestamp: string }>> => {
-    return TenantService.performHealthCheck();
+export const getAllFieldDefinitions = api(
+  { auth: true, method: 'GET', path: '/tenants/:tenantId/fields' },
+  async ({
+    tenantId,
+  }: {
+    tenantId: string;
+  }): Promise<ApiResponse<Record<string, ExtensionFieldDefinition[]>>> => {
+    const authData = getAuthData() as AuthData;
+    return TenantService.getAllFieldDefinitionsForTenant(tenantId);
+  }
+);
+
+/**
+ * Создание нового определения поля
+ */
+export const createFieldDefinition = api(
+  { auth: true, method: 'POST', path: '/tenants/:tenantId/fields' },
+  async ({
+    tenantId,
+    fieldDefinition,
+  }: {
+    tenantId: string;
+    fieldDefinition: Omit<
+      ExtensionFieldDefinition,
+      'id' | 'tenant_id' | 'created_at' | 'updated_at'
+    >;
+  }): Promise<ApiResponse<ExtensionFieldDefinition>> => {
+    const authData = getAuthData() as AuthData;
+    return TenantService.createFieldDefinition(tenantId, fieldDefinition);
+  }
+);
+
+/**
+ * Обновление определения поля
+ */
+export const updateFieldDefinition = api(
+  { auth: true, method: 'PUT', path: '/tenants/fields/:fieldId' },
+  async ({
+    fieldId,
+    updates,
+  }: {
+    fieldId: number;
+    updates: Partial<
+      Omit<ExtensionFieldDefinition, 'id' | 'tenant_id' | 'created_at' | 'updated_at'>
+    >;
+  }): Promise<ApiResponse<ExtensionFieldDefinition>> => {
+    const authData = getAuthData() as AuthData;
+    return TenantService.updateFieldDefinition(fieldId, updates);
+  }
+);
+
+/**
+ * Удаление определения поля
+ */
+export const deleteFieldDefinition = api(
+  { auth: true, method: 'DELETE', path: '/tenants/fields/:fieldId' },
+  async ({ fieldId }: { fieldId: number }): Promise<ApiResponse<boolean>> => {
+    const authData = getAuthData() as AuthData;
+    return TenantService.deleteFieldDefinition(fieldId);
+  }
+);
+
+/**
+ * Получение статистики использования extensible fields
+ */
+export const getExtensibleFieldsStats = api(
+  { auth: true, method: 'GET', path: '/tenants/extensible-fields/stats' },
+  async (): Promise<
+    ApiResponse<{
+      totalTenants: number;
+      totalFields: number;
+      fieldsByTenant: Record<string, number>;
+      fieldsByEntity: Record<string, number>;
+    }>
+  > => {
+    const authData = getAuthData() as AuthData;
+    return TenantService.getExtensibleFieldsStats();
+  }
+);
+
+/**
+ * Получение списка поддерживаемых сущностей
+ */
+export const getSupportedEntities = api(
+  { auth: true, method: 'GET', path: '/tenants/extensible-fields/supported-entities' },
+  async (): Promise<ApiResponse<string[]>> => {
+    return TenantService.getSupportedEntities();
   }
 );
