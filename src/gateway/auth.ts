@@ -77,6 +77,18 @@ export const auth = authHandler<AuthParams, AuthData>(
  */
 async function validateJWTToken(token: string, tenantId: string): Promise<AuthData> {
   const config = await getTenantConfigById(tenantId);
+  
+  // Check if this is a service_role token by comparing with tenant's service key
+  if (token === config.SERVICE_KEY) {
+    return {
+      userID: 'system',
+      tenantId,
+      userEmail: 'system@admin.local',
+      userRole: 'service_role',
+      tokenType: 'jwt',
+    };
+  }
+  
   const supabase = createClient(config.SUPABASE_URL, config.ANON_KEY);
 
   // Verify JWT token with Supabase

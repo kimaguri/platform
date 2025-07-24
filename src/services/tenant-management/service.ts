@@ -8,29 +8,30 @@ import type {
   TenantConfig,
 } from './src/models/tenant';
 
-// Import admin DB functions for tenant operations
-import {
-  getActiveTenants,
-  getTenantFullInfo,
-  createTenant as createTenantInDb,
-  updateTenant as updateTenantInDb,
-  deactivateTenant as deactivateTenantInDb,
-  createSupabaseConfig as createSupabaseConfigInDb,
-  checkAdminConnection,
-} from '../../lib/adminDb/client';
-import { clearConfigCache } from '../../lib/config/tenantConfig';
+// Import new functional repositories
+import { createAdminAdapter } from './src/database/adapters/adminAdapter';
+import { createTenantRepository, createExtensionFieldRepository } from './src/database/repositories';
+import type { ExtensionFieldDefinition } from './src/database/types';
+import { SUPPORTED_ENTITIES } from './src/extensible-fields';
+import { getTenantFullInfo, checkAdminConnection } from '../../lib/adminDb/client';
 
-// Import extensible fields functions
-import {
-  getFieldDefinitionsForTenant as getFieldDefinitionsFromAdmin,
-  getAllFieldDefinitionsForTenant as getAllFieldDefinitionsFromAdmin,
-  createFieldDefinition as createFieldDefinitionInAdmin,
-  updateFieldDefinition as updateFieldDefinitionInAdmin,
-  deleteFieldDefinition as deleteFieldDefinitionInAdmin,
-  getExtensibleFieldsStats as getExtensibleFieldsStatsFromAdmin,
-  SUPPORTED_ENTITIES,
-  type ExtensionFieldDefinition,
-} from './src/extensible-fields';
+// Cache for repositories
+let tenantRepo: ReturnType<typeof createTenantRepository> | null = null;
+let extensionRepo: ReturnType<typeof createExtensionFieldRepository> | null = null;
+
+/**
+ * Initialize repositories with hardcoded credentials
+ */
+function initializeRepositories() {
+  if (!tenantRepo) {
+    // Using hardcoded credentials for simplx_crm_tenant
+    const adapter = createAdminAdapter();
+    tenantRepo = createTenantRepository(adapter);
+    extensionRepo = createExtensionFieldRepository(adapter);
+  }
+  
+  return { tenantRepo, extensionRepo };
+}
 
 /**
  * Tenant Management Business Logic
@@ -271,7 +272,11 @@ export async function getFieldDefinitionsForTenant(
   entityTable: string
 ): Promise<ApiResponse<ExtensionFieldDefinition[]>> {
   try {
-    const definitions = await getFieldDefinitionsFromAdmin(tenantId, entityTable);
+    const { extensionRepo } = initializeRepositories();
+    if (!extensionRepo) {
+      throw new Error('Extension repository not initialized');
+    }
+    const definitions = await extensionRepo.findByTenantAndEntity(tenantId, entityTable);
 
     return {
       data: definitions,
@@ -292,7 +297,20 @@ export async function getAllFieldDefinitionsForTenant(
   tenantId: string
 ): Promise<ApiResponse<Record<string, ExtensionFieldDefinition[]>>> {
   try {
-    const definitions = await getAllFieldDefinitionsFromAdmin(tenantId);
+    const { extensionRepo } = initializeRepositories();
+    if (!extensionRepo) {
+      throw new Error('Extension repository not initialized');
+    }
+    const allDefinitions = await extensionRepo.findByTenant(tenantId);
+    
+    // Group by entity_table
+    const definitions: Record<string, ExtensionFieldDefinition[]> = {};
+    for (const def of allDefinitions) {
+      if (!definitions[def.entity_table]) {
+        definitions[def.entity_table] = [];
+      }
+      definitions[def.entity_table].push(def);
+    }
 
     const totalFields = Object.values(definitions).reduce((sum, fields) => sum + fields.length, 0);
 
@@ -318,7 +336,14 @@ export async function createFieldDefinition(
   fieldDefinition: Omit<ExtensionFieldDefinition, 'id' | 'tenant_id' | 'created_at' | 'updated_at'>
 ): Promise<ApiResponse<ExtensionFieldDefinition>> {
   try {
-    const definition = await createFieldDefinitionInAdmin(tenantId, fieldDefinition);
+    const { extensionRepo } = initializeRepositories();
+    if (!extensionRepo) {
+      throw new Error('Extension repository not initialized');
+    }
+    const definition = await extensionRepo.create({
+      ...fieldDefinition,
+      tenant_id: tenantId,
+    });
 
     return {
       data: definition,
@@ -340,7 +365,11 @@ export async function updateFieldDefinition(
   updates: Partial<Omit<ExtensionFieldDefinition, 'id' | 'tenant_id' | 'created_at' | 'updated_at'>>
 ): Promise<ApiResponse<ExtensionFieldDefinition>> {
   try {
-    const definition = await updateFieldDefinitionInAdmin(fieldId, updates);
+    const { extensionRepo } = initializeRepositories();
+    if (!extensionRepo) {
+      throw new Error('Extension repository not initialized');
+    }
+    const definition = await extensionRepo.update(fieldId, updates);
 
     return {
       data: definition,
@@ -359,7 +388,11 @@ export async function updateFieldDefinition(
  */
 export async function deleteFieldDefinition(fieldId: number): Promise<ApiResponse<boolean>> {
   try {
-    await deleteFieldDefinitionInAdmin(fieldId);
+    const { extensionRepo } = initializeRepositories();
+    if (!extensionRepo) {
+      throw new Error('Extension repository not initialized');
+    }
+    await extensionRepo.delete(fieldId);
 
     return {
       data: true,
@@ -385,7 +418,32 @@ export async function getExtensibleFieldsStats(): Promise<
   }>
 > {
   try {
-    const stats = await getExtensibleFieldsStatsFromAdmin();
+    const { tenantRepo, extensionRepo } = initializeRepositories();
+    if (!tenantRepo || !extensionRepo) {
+      throw new Error('Repositories not initialized');
+    }
+    
+    // Get all tenants and extension fields
+    const tenants = await tenantRepo.findAll();
+    const allFields = await extensionRepo.findAll();
+    
+    // Calculate stats
+    const fieldsByTenant: Record<string, number> = {};
+    const fieldsByEntity: Record<string, number> = {};
+    
+    for (const field of allFields) {
+      // Count by tenant
+      fieldsByTenant[field.tenant_id] = (fieldsByTenant[field.tenant_id] || 0) + 1;
+      // Count by entity
+      fieldsByEntity[field.entity_table] = (fieldsByEntity[field.entity_table] || 0) + 1;
+    }
+    
+    const stats = {
+      totalTenants: tenants.length,
+      totalFields: allFields.length,
+      fieldsByTenant,
+      fieldsByEntity,
+    };
 
     return {
       data: stats,
@@ -445,7 +503,11 @@ export async function getTenantStats(): Promise<
   }>
 > {
   try {
-    const tenants = await getActiveTenants();
+    const { tenantRepo } = initializeRepositories();
+    if (!tenantRepo) {
+      throw new Error('Tenant repository not initialized');
+    }
+    const tenants = await tenantRepo.findAll();
     const activeTenants = tenants.filter((t) => t.status === 'active');
     const inactiveTenants = tenants.filter((t) => t.status !== 'active');
 
@@ -475,7 +537,11 @@ export async function searchTenants(
   try {
     // Get all tenants and filter manually for now
     // TODO: Implement proper search through ResourceResolver when available
-    const allTenants = await getActiveTenants();
+    const { tenantRepo } = initializeRepositories();
+    if (!tenantRepo) {
+      throw new Error('Tenant repository not initialized');
+    }
+    const allTenants = await tenantRepo.findAll();
 
     const filteredTenants = allTenants
       .filter(

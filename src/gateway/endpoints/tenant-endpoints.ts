@@ -164,8 +164,8 @@ export const getTenantById = api(
   async ({ id }: { id: string }): Promise<ApiResponse<TenantProfile>> => {
     const authData = getAuthData() as AuthData;
 
-    // Users can only access their own tenant or super admins can access any
-    if (authData.tenantId !== id && authData.role !== 'super_admin') {
+    // Users can only access their own tenant or super admins/service_role can access any
+    if (authData.tenantId !== id && authData.userRole !== 'super_admin' && authData.userRole !== 'service_role') {
       throw new Error('Insufficient permissions to view this tenant');
     }
 

@@ -218,3 +218,14 @@ export const getSupportedEntities = api(
     return TenantService.getSupportedEntities();
   }
 );
+
+/**
+ * Health check endpoint (no auth required)
+ * Used for system monitoring and load balancer health checks
+ */
+export const health = api(
+  { method: 'GET', path: '/health' },
+  async (): Promise<ApiResponse<{ admin_db_connected: boolean; timestamp: string }>> => {
+    return TenantService.performHealthCheck();
+  }
+);
