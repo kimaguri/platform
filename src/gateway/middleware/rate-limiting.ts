@@ -1,5 +1,6 @@
 import { middleware } from 'encore.dev/api';
 import { APIError } from 'encore.dev/api';
+import { extractRequestInfo, getTenantId, getClientIP } from '../utils/header-utils';
 import { getAuthData } from '~encore/auth';
 import type { AuthData } from '../auth';
 
@@ -25,12 +26,14 @@ const RATE_LIMITS: Record<string, RateLimitConfig> = {
  * This middleware runs after auth to have access to user data
  */
 export const rateLimitingMiddleware = middleware(async (req, next) => {
-  const data = req.data;
   const now = Date.now();
 
+  // Extract request information using utility
+  const { headers } = extractRequestInfo(req);
+
   // Get identifiers for rate limiting
-  const tenantId = data.headers?.['x-tenant-id'] || data.headers?.['X-Tenant-ID'];
-  const clientIP = data.headers?.['x-forwarded-for'] || data.headers?.['x-real-ip'] || 'unknown';
+  const tenantId = getTenantId(headers);
+  const clientIP = getClientIP(headers);
 
   let userID: string | undefined;
   try {

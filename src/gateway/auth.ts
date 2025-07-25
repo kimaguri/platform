@@ -5,7 +5,7 @@ import { createClient } from '@supabase/supabase-js';
 
 // Auth parameters that Encore will parse from the request
 export interface AuthParams {
-  authorization: Header<'Authorization'>; // Bearer token or API key
+  authorization?: Header<'Authorization'>; // Bearer token or API key (optional)
   tenantId: Header<'X-Tenant-ID'>; // Required tenant ID
 }
 
@@ -40,6 +40,8 @@ export const auth = authHandler<AuthParams, AuthData>(
 
     // Parse authorization header
     if (!authorization) {
+      // For public endpoints (auth: false), this will allow the request to proceed as unauthenticated
+      // For protected endpoints (auth: true), Encore will automatically reject the request
       throw APIError.unauthenticated('Authorization header is required');
     }
 
@@ -77,7 +79,7 @@ export const auth = authHandler<AuthParams, AuthData>(
  */
 async function validateJWTToken(token: string, tenantId: string): Promise<AuthData> {
   const config = await getTenantConfigById(tenantId);
-  
+
   // Check if this is a service_role token by comparing with tenant's service key
   if (token === config.SERVICE_KEY) {
     return {
@@ -88,7 +90,7 @@ async function validateJWTToken(token: string, tenantId: string): Promise<AuthDa
       tokenType: 'jwt',
     };
   }
-  
+
   const supabase = createClient(config.SUPABASE_URL, config.ANON_KEY);
 
   // Verify JWT token with Supabase

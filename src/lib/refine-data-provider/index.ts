@@ -5,7 +5,7 @@
  */
 
 // Основные провайдеры
-export { createSimplxDataProvider } from './dataProvider';
+export { createSimplxDataProvider, refreshTokenCache, destroyTokenCache } from './dataProvider';
 export { createSimplxAuthProvider } from './authProvider';
 
 // Типы

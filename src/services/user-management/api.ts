@@ -85,3 +85,60 @@ export const deactivateUser = api(
     return UserService.deactivateUser(authData.tenantId, userId);
   }
 );
+
+/**
+ * Authentication - Login user
+ * Public endpoint (auth: false) for authentication
+ */
+export const login = api(
+  { auth: false, method: 'POST', path: '/auth/login' },
+  async (params: {
+    tenantId: string;
+    email: string;
+    password: string;
+  }): Promise<ApiResponse<{
+    token: string;
+    refreshToken?: string;
+    expiresAt: string;
+    user: {
+      id: string;
+      email: string;
+      firstName?: string;
+      lastName?: string;
+      displayName?: string;
+      role: string;
+    };
+  }>> => {
+    return UserService.login(params);
+  }
+);
+
+/**
+ * Authentication - Register user
+ * Public endpoint (auth: false) for registration
+ */
+export const register = api(
+  { auth: false, method: 'POST', path: '/auth/register' },
+  async (params: {
+    tenantId: string;
+    email: string;
+    password: string;
+    firstName?: string;
+    lastName?: string;
+    displayName?: string;
+  }): Promise<ApiResponse<{
+    token: string;
+    refreshToken?: string;
+    expiresAt: string;
+    user: {
+      id: string;
+      email: string;
+      firstName?: string;
+      lastName?: string;
+      displayName?: string;
+      role: string;
+    };
+  }>> => {
+    return UserService.register(params);
+  }
+);

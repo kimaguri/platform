@@ -1,4 +1,5 @@
 import { middleware } from 'encore.dev/api';
+import { extractRequestInfo, getTenantId, getUserAgent, getClientIP } from '../utils/header-utils';
 import { getAuthData } from '~encore/auth';
 import type { AuthData } from '../auth';
 import { recordRequest } from '../endpoints/metrics-endpoints';
@@ -42,14 +43,13 @@ function extractServiceName(path: string): string {
  */
 export const loggingMiddleware = middleware(async (req, next) => {
   const startTime = Date.now();
-  const data = req.data;
-
-  // Extract request information
-  const method = data.method || 'UNKNOWN';
-  const path = data.path || '/';
-  const tenantId = data.headers?.['x-tenant-id'] || data.headers?.['X-Tenant-ID'];
-  const userAgent = data.headers?.['user-agent'];
-  const ip = data.headers?.['x-forwarded-for'] || data.headers?.['x-real-ip'] || 'unknown';
+  
+  // Extract request information using utility
+  const { headers, method, path } = extractRequestInfo(req);
+  
+  const tenantId = getTenantId(headers);
+  const userAgent = getUserAgent(headers);
+  const ip = getClientIP(headers);
 
   let authData: AuthData | undefined;
   try {

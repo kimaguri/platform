@@ -94,15 +94,37 @@ export const userManagementClient = {
     throw new Error('User management service not available');
   },
 
-  // Legacy methods for backward compatibility
-  login: async (params: any) => {
-    throw new Error('Login should be handled by auth middleware, not RPC');
+  /**
+   * Authentication - Login user
+   */
+  login: async (params: { tenantId: string; email: string; password: string }) => {
+    if (userManagementService?.login) {
+      return await userManagementService.login(params);
+    }
+    throw new Error('User management service not available');
   },
-  register: async (params: any) => {
-    throw new Error('Registration should be handled by auth middleware, not RPC');
+  /**
+   * Authentication - Register user
+   */
+  register: async (params: {
+    tenantId: string;
+    email: string;
+    password: string;
+    firstName?: string;
+    lastName?: string;
+    displayName?: string;
+  }) => {
+    if (userManagementService?.register) {
+      return await userManagementService.register(params);
+    }
+    throw new Error('User management service not available');
   },
   getUser: async (params: any) => {
-    return await userManagementClient.getUserProfile({ userId: params.userID });
+    console.log('params', params);
+    return await userManagementService.getUserProfileById({
+      tenantId: params.tenantId,
+      userId: params.userID,
+    });
   },
   updateUser: async (params: any) => {
     const { userID, ...updateData } = params;

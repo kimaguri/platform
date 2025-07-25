@@ -56,12 +56,12 @@ interface UpdateUserRequest {
  */
 
 export const login = api(
-  { method: 'POST', path: '/api/v1/auth/login', expose: true },
+  { method: 'POST', path: '/api/v1/auth/login', expose: true, auth: false },
   async (
-    data: LoginRequest & { tenantId: Header<'X-Tenant-ID'> }
+    data: LoginRequest & { tenantId: Header<'X-Tenant-Id'> }
   ): Promise<ApiResponse<AuthResponse>> => {
     try {
-      // Proxy to user-management service
+      // Use RPC call to user-management service through universal adapter
       const result = await userManagementClient.login({
         tenantId: data.tenantId,
         email: data.email,
@@ -79,12 +79,12 @@ export const login = api(
 );
 
 export const register = api(
-  { method: 'POST', path: '/api/v1/auth/register', expose: true },
+  { method: 'POST', path: '/api/v1/auth/register', expose: true, auth: false },
   async (
     data: RegisterRequest & { tenantId: Header<'X-Tenant-ID'> }
   ): Promise<ApiResponse<AuthResponse>> => {
     try {
-      // Proxy to user-management service
+      // Use RPC call to user-management service through universal adapter
       const result = await userManagementClient.register({
         tenantId: data.tenantId,
         email: data.email,
