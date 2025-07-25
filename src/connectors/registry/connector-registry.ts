@@ -68,6 +68,35 @@ export function getAvailableConnectorTypes(): string[] {
 }
 
 /**
+ * Get admin adapter for tenant-management operations
+ * Uses hardcoded admin DB credentials for consistency with current implementation
+ */
+export function getAdminAdapter(table: string): Adapter {
+  const cacheKey = `admin:${table}`;
+  
+  if (registryState.cache.has(cacheKey)) {
+    return registryState.cache.get(cacheKey)!;
+  }
+
+  // Use the same hardcoded admin DB config as current adminAdapter
+  const adminConfig = {
+    type: 'supabase' as const,
+    supabaseUrl: 'https://zshakbdzhwxfxzyqtizl.supabase.co',
+    supabaseKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpzaGFrYmR6aHd4Znh6eXF0aXpsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MzExMzk0OSwiZXhwIjoyMDY4Njg5OTQ5fQ.c67jAz_5TLnq7GY9hega04v1M7Jv0OiTrVfBlPBiEPI',
+    table,
+  };
+
+  const factory = registryState.factories.get('supabase');
+  if (!factory) {
+    throw new Error('Supabase adapter factory not registered');
+  }
+
+  const adapter = factory(adminConfig);
+  registryState.cache.set(cacheKey, adapter);
+  return adapter;
+}
+
+/**
  * Get adapter for tenant - integrates with existing connector-type system
  */
 export async function getAdapterForTenant(tenantId: string, table: string): Promise<Adapter> {

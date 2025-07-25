@@ -8,30 +8,30 @@ import type {
   TenantConfig,
 } from './src/models/tenant';
 
-// Import new functional repositories
-import { createAdminAdapter } from './src/database/adapters/adminAdapter';
-import { createTenantRepository, createExtensionFieldRepository } from './src/database/repositories';
-import type { ExtensionFieldDefinition } from './src/database/types';
+// Import admin operations - functional approach following other services
+import {
+  getAllTenants,
+  getTenantById as getAdminTenantById,
+  createTenant as createAdminTenant,
+  updateTenant as updateAdminTenant,
+  deleteTenant as deleteAdminTenant,
+  getAllTenantConfigs,
+  getTenantConfigById as getAdminTenantConfigById,
+  createTenantConfig as createAdminTenantConfig,
+  updateTenantConfig as updateAdminTenantConfig,
+  getAllExtensionFields,
+  getExtensionFieldsByTenant,
+  getExtensionFieldsByTenantAndEntity,
+  createExtensionField as createAdminExtensionField,
+  updateExtensionField as updateAdminExtensionField,
+  deleteExtensionField as deleteAdminExtensionField,
+  checkAdminConnection,
+  countAdminResources,
+} from './src/admin-operations';
+
+import type { ExtensionFieldDefinition } from './src/models/extensionField';
 import { SUPPORTED_ENTITIES } from './src/extensible-fields';
-import { getTenantFullInfo, checkAdminConnection } from '../../lib/adminDb/client';
-
-// Cache for repositories
-let tenantRepo: ReturnType<typeof createTenantRepository> | null = null;
-let extensionRepo: ReturnType<typeof createExtensionFieldRepository> | null = null;
-
-/**
- * Initialize repositories with hardcoded credentials
- */
-function initializeRepositories() {
-  if (!tenantRepo) {
-    // Using hardcoded credentials for simplx_crm_tenant
-    const adapter = createAdminAdapter();
-    tenantRepo = createTenantRepository(adapter);
-    extensionRepo = createExtensionFieldRepository(adapter);
-  }
-  
-  return { tenantRepo, extensionRepo };
-}
+import { getTenantFullInfo } from '../../lib/adminDb/client';
 
 /**
  * Tenant Management Business Logic
@@ -272,11 +272,7 @@ export async function getFieldDefinitionsForTenant(
   entityTable: string
 ): Promise<ApiResponse<ExtensionFieldDefinition[]>> {
   try {
-    const { extensionRepo } = initializeRepositories();
-    if (!extensionRepo) {
-      throw new Error('Extension repository not initialized');
-    }
-    const definitions = await extensionRepo.findByTenantAndEntity(tenantId, entityTable);
+    const definitions = await getExtensionFieldsByTenantAndEntity(tenantId, entityTable);
 
     return {
       data: definitions,
@@ -297,11 +293,7 @@ export async function getAllFieldDefinitionsForTenant(
   tenantId: string
 ): Promise<ApiResponse<Record<string, ExtensionFieldDefinition[]>>> {
   try {
-    const { extensionRepo } = initializeRepositories();
-    if (!extensionRepo) {
-      throw new Error('Extension repository not initialized');
-    }
-    const allDefinitions = await extensionRepo.findByTenant(tenantId);
+    const allDefinitions = await getExtensionFieldsByTenant(tenantId);
     
     // Group by entity_table
     const definitions: Record<string, ExtensionFieldDefinition[]> = {};
@@ -309,7 +301,7 @@ export async function getAllFieldDefinitionsForTenant(
       if (!definitions[def.entity_table]) {
         definitions[def.entity_table] = [];
       }
-      definitions[def.entity_table].push(def);
+      definitions[def.entity_table]!.push(def);
     }
 
     const totalFields = Object.values(definitions).reduce((sum, fields) => sum + fields.length, 0);
@@ -336,11 +328,7 @@ export async function createFieldDefinition(
   fieldDefinition: Omit<ExtensionFieldDefinition, 'id' | 'tenant_id' | 'created_at' | 'updated_at'>
 ): Promise<ApiResponse<ExtensionFieldDefinition>> {
   try {
-    const { extensionRepo } = initializeRepositories();
-    if (!extensionRepo) {
-      throw new Error('Extension repository not initialized');
-    }
-    const definition = await extensionRepo.create({
+    const definition = await createAdminExtensionField({
       ...fieldDefinition,
       tenant_id: tenantId,
     });
@@ -365,11 +353,10 @@ export async function updateFieldDefinition(
   updates: Partial<Omit<ExtensionFieldDefinition, 'id' | 'tenant_id' | 'created_at' | 'updated_at'>>
 ): Promise<ApiResponse<ExtensionFieldDefinition>> {
   try {
-    const { extensionRepo } = initializeRepositories();
-    if (!extensionRepo) {
-      throw new Error('Extension repository not initialized');
+    const definition = await updateAdminExtensionField(fieldId, updates);
+    if (!definition) {
+      throw new Error('Field definition not found');
     }
-    const definition = await extensionRepo.update(fieldId, updates);
 
     return {
       data: definition,
@@ -388,11 +375,10 @@ export async function updateFieldDefinition(
  */
 export async function deleteFieldDefinition(fieldId: number): Promise<ApiResponse<boolean>> {
   try {
-    const { extensionRepo } = initializeRepositories();
-    if (!extensionRepo) {
-      throw new Error('Extension repository not initialized');
+    const success = await deleteAdminExtensionField(fieldId);
+    if (!success) {
+      throw new Error('Field definition not found');
     }
-    await extensionRepo.delete(fieldId);
 
     return {
       data: true,
@@ -418,14 +404,9 @@ export async function getExtensibleFieldsStats(): Promise<
   }>
 > {
   try {
-    const { tenantRepo, extensionRepo } = initializeRepositories();
-    if (!tenantRepo || !extensionRepo) {
-      throw new Error('Repositories not initialized');
-    }
-    
-    // Get all tenants and extension fields
-    const tenants = await tenantRepo.findAll();
-    const allFields = await extensionRepo.findAll();
+    // Get all tenants and extension fields using admin operations
+    const tenants = await getAllTenants();
+    const allFields = await getAllExtensionFields();
     
     // Calculate stats
     const fieldsByTenant: Record<string, number> = {};
@@ -537,11 +518,7 @@ export async function searchTenants(
   try {
     // Get all tenants and filter manually for now
     // TODO: Implement proper search through ResourceResolver when available
-    const { tenantRepo } = initializeRepositories();
-    if (!tenantRepo) {
-      throw new Error('Tenant repository not initialized');
-    }
-    const allTenants = await tenantRepo.findAll();
+    const allTenants = await getAllTenants();
 
     const filteredTenants = allTenants
       .filter(
