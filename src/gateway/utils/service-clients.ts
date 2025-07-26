@@ -228,7 +228,11 @@ export const dataProcessingClient = {
    */
   listEntityRecords: async (params: { entity: string; limit?: number; offset?: number }) => {
     if (dataProcessingService?.getEntityList) {
-      return await dataProcessingService.getEntityList(params);
+      return await dataProcessingService.getEntityList({
+        entityTable: params.entity,
+        limit: params.limit,
+        offset: params.offset,
+      });
     }
     throw new Error('Content management service not available');
   },
@@ -237,8 +241,11 @@ export const dataProcessingClient = {
    * Get single entity by ID
    */
   getEntityRecord: async (params: { entity: string; id: string }) => {
-    if (dataProcessingService?.getEntityRecord) {
-      return await dataProcessingService.getEntityRecord(params);
+    if (dataProcessingService?.getEntityRecordData) {
+      return await dataProcessingService.getEntityRecordData({
+        entityTable: params.entity,
+        recordId: params.id,
+      });
     }
     throw new Error('Data processing service not available');
   },

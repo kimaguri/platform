@@ -161,11 +161,13 @@ export const listEntityRecords = api(
   async ({
     limit,
     offset,
+    page,
     entity,
     status,
   }: {
     limit?: Query<number>;
     offset?: Query<number>;
+    page?: Query<number>;
     entity: string;
     status?: Query<'draft' | 'published' | 'archived'>;
   }): Promise<ApiResponse<ContentItem[]>> => {
@@ -177,25 +179,45 @@ export const listEntityRecords = api(
     // }
 
     try {
+      // Calculate offset from page if provided (Refine compatibility)
+      const finalLimit = limit || 50;
+      let finalOffset = offset || 0;
+      
+      // If page is provided, convert it to offset (page is 1-based)
+      if (page && page > 0) {
+        finalOffset = (page - 1) * finalLimit;
+      }
+
       // Proxy to data-processing service
       const result = await dataProcessingClient.listEntityRecords({
         entity,
-        limit: limit || 50,
-        offset: offset || 0,
+        limit: finalLimit,
+        offset: finalOffset,
       });
 
+      // Check if the result contains an error
+      if ('error' in result && result.error) {
+        throw new Error(result.error);
+      }
+
+      // Extract data from the nested structure returned by data-processing service
+      const responseData = result.data || result;
+      const entities = responseData.data || [];
+      const total = responseData.total || 0;
+      const pagination = responseData.pagination || {};
+
       return {
-        data: (result as any)?.content || [],
-        message: 'Content retrieved',
+        data: entities,
+        message: result.message || 'Entities retrieved successfully',
         meta: {
-          total: (result as any)?.total || 0,
-          limit: limit || 50,
-          page: Math.floor((offset || 0) / (limit || 50)) + 1,
+          total: total,
+          limit: finalLimit,
+          page: Math.floor(finalOffset / finalLimit) + 1,
         },
       };
     } catch (error) {
       throw new Error(
-        `Failed to list content: ${error instanceof Error ? error.message : 'Unknown error'}`
+        `Failed to list entities: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
     }
   }
