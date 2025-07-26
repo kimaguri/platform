@@ -11,7 +11,7 @@
 // For now using dynamic imports to avoid build errors
 let userManagementService: any;
 let tenantManagementService: any;
-let contentManagementService: any;
+let dataProcessingService: any;
 
 // Initialize clients asynchronously
 async function initializeClients() {
@@ -20,7 +20,7 @@ async function initializeClients() {
     const clients = await import('~encore/clients');
     userManagementService = clients.user_management;
     tenantManagementService = clients.tenant_management;
-    contentManagementService = clients.content_management;
+    dataProcessingService = clients.data_processing;
   } catch (error) {
     console.warn('Encore clients not available yet, using fallback implementations');
   }
@@ -219,16 +219,16 @@ export const tenantManagementClient = {
 };
 
 /**
- * Content Management Service Client
+ * Data Processing Service Client
  * Wraps the RPC calls with proper error handling
  */
-export const contentManagementClient = {
+export const dataProcessingClient = {
   /**
    * List entities with pagination
    */
-  listEntities: async (params: { entity: string; limit?: number; offset?: number }) => {
-    if (contentManagementService?.listEntities) {
-      return await contentManagementService.listEntities(params);
+  listEntityRecords: async (params: { entity: string; limit?: number; offset?: number }) => {
+    if (dataProcessingService?.getEntityList) {
+      return await dataProcessingService.getEntityList(params);
     }
     throw new Error('Content management service not available');
   },
@@ -236,115 +236,81 @@ export const contentManagementClient = {
   /**
    * Get single entity by ID
    */
-  getEntity: async (params: { entity: string; id: string }) => {
-    if (contentManagementService?.getEntity) {
-      return await contentManagementService.getEntity(params);
+  getEntityRecord: async (params: { entity: string; id: string }) => {
+    if (dataProcessingService?.getEntityRecord) {
+      return await dataProcessingService.getEntityRecord(params);
     }
-    throw new Error('Content management service not available');
+    throw new Error('Data processing service not available');
   },
 
   /**
    * Create new entity
    */
-  createEntity: async (params: { entity: string; data: Record<string, any> }) => {
-    if (contentManagementService?.createEntity) {
-      return await contentManagementService.createEntity(params);
+  createEntityRecord: async (params: { entity: string; data: Record<string, any> }) => {
+    if (dataProcessingService?.createEntityRecord) {
+      return await dataProcessingService.createEntityRecord(params);
     }
-    throw new Error('Content management service not available');
+    throw new Error('Data processing service not available');
   },
 
   /**
    * Update existing entity
    */
-  updateEntity: async (params: { entity: string; id: string; data: Record<string, any> }) => {
-    if (contentManagementService?.updateEntity) {
-      return await contentManagementService.updateEntity(params);
+  updateEntityRecord: async (params: { entity: string; id: string; data: Record<string, any> }) => {
+    if (dataProcessingService?.updateEntityRecord) {
+      return await dataProcessingService.updateEntityRecord(params);
     }
-    throw new Error('Content management service not available');
+    throw new Error('Data processing service not available');
   },
 
   /**
    * Delete entity by ID
    */
-  deleteEntity: async (params: { entity: string; id: string }) => {
-    if (contentManagementService?.deleteEntity) {
-      return await contentManagementService.deleteEntity(params);
+  deleteEntityRecord: async (params: { entity: string; id: string }) => {
+    if (dataProcessingService?.deleteEntityRecord) {
+      return await dataProcessingService.deleteEntityRecord(params);
     }
-    throw new Error('Content management service not available');
+    throw new Error('Data processing service not available');
   },
 
   /**
    * Upsert entity (create or update)
    */
-  upsertEntity: async (params: {
+  upsertEntityRecord: async (params: {
     entity: string;
     data: Record<string, any>;
     conflictColumns?: string[];
   }) => {
-    if (contentManagementService?.upsertEntity) {
-      return await contentManagementService.upsertEntity(params);
+    if (dataProcessingService?.upsertEntityRecord) {
+      return await dataProcessingService.upsertEntityRecord(params);
     }
-    throw new Error('Content management service not available');
+    throw new Error('Data processing service not available');
   },
 
   /**
    * Count entities in table
    */
-  countEntities: async (params: { entity: string; filter?: string }) => {
-    if (contentManagementService?.countEntities) {
-      return await contentManagementService.countEntities(params);
+  countEntityRecords: async (params: { entity: string; filter?: string }) => {
+    if (dataProcessingService?.countEntityRecords) {
+      return await dataProcessingService.countEntityRecords(params);
     }
-    throw new Error('Content management service not available');
+    throw new Error('Data processing service not available');
   },
 
   /**
    * Search entities with filter
    */
-  searchEntities: async (params: {
+  searchEntityRecords: async (params: {
     entity: string;
     filter?: Record<string, any>;
     limit?: number;
     offset?: number;
     orderBy?: Array<{ field: string; direction: 'asc' | 'desc' }>;
   }) => {
-    if (contentManagementService?.searchEntities) {
-      return await contentManagementService.searchEntities(params);
+    if (dataProcessingService?.searchEntityRecords) {
+      return await dataProcessingService.searchEntityRecords(params);
     }
-    throw new Error('Content management service not available');
-  },
-
-  // Legacy methods for backward compatibility
-  getContent: async (params: any) => {
-    return await contentManagementClient.getEntity({
-      entity: params.entity || 'content',
-      id: params.id,
-    });
-  },
-  createContent: async (params: any) => {
-    return await contentManagementClient.createEntity({
-      entity: params.entity || 'content',
-      data: params.data,
-    });
-  },
-  updateContent: async (params: any) => {
-    return await contentManagementClient.updateEntity({
-      entity: params.entity || 'content',
-      id: params.id,
-      data: params.data,
-    });
-  },
-  deleteContent: async (params: any) => {
-    return await contentManagementClient.deleteEntity({
-      entity: params.entity || 'content',
-      id: params.id,
-    });
-  },
-  listContent: async (params: any) => {
-    return await contentManagementClient.listEntities({
-      entity: params.entity || 'content',
-      limit: params.limit,
-      offset: params.offset,
-    });
+    throw new Error('Data processing service not available');
   },
 };
 

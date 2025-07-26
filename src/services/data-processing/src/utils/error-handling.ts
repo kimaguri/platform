@@ -1,4 +1,4 @@
-import type { ValidationError, ValidationWarning } from './validation';
+import type { ValidationError, ValidationWarning } from '../validation';
 
 /**
  * Error Handling System for Extensible Fields

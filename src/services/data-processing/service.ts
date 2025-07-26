@@ -15,7 +15,7 @@ import {
   type ExtensionFieldsFilter,
   type ExtensionFieldsSorter,
   type ExtensionFieldValue,
-} from './src/extensible-fields';
+} from './src/utils/extensible-fields';
 
 /**
  * Content Management Business Logic
@@ -25,9 +25,9 @@ import {
  */
 
 /**
- * Health check for content management service
+ * Health check for data processing service
  */
-export async function performHealthCheck(): Promise<
+export async function performDataProcessingServiceHealthCheck(): Promise<
   ApiResponse<{ status: string; timestamp: string }>
 > {
   try {
@@ -37,12 +37,12 @@ export async function performHealthCheck(): Promise<
         status: 'healthy',
         timestamp: new Date().toISOString(),
       },
-      message: 'Content Management Service is healthy',
+      message: 'Data Processing Service is healthy',
     };
   } catch (error) {
     return {
       error: error instanceof Error ? error.message : 'Health check failed',
-      message: 'Content Management Service health check failed',
+      message: 'Data Processing Service health check failed',
     };
   }
 }
@@ -52,7 +52,7 @@ export async function performHealthCheck(): Promise<
 /**
  * Get single entity with extensible fields
  */
-export async function getEntityWithExtensions(
+export async function getEntityRecord(
   tenantId: string,
   entityTable: string,
   entityId: string
@@ -82,7 +82,7 @@ export async function getEntityWithExtensions(
 /**
  * Get list of entities with extensible fields
  */
-export async function getEntitiesWithExtensions(
+export async function getEntityList(
   tenantId: string,
   entityTable: string,
   options: {
@@ -110,7 +110,7 @@ export async function getEntitiesWithExtensions(
 /**
  * Create entity with extensible fields
  */
-export async function createEntityWithExtensions(
+export async function createEntityRecord(
   tenantId: string,
   entityTable: string,
   entityData: Record<string, any>,
@@ -139,7 +139,7 @@ export async function createEntityWithExtensions(
 /**
  * Update entity with extensible fields
  */
-export async function updateEntityWithExtensions(
+export async function updateEntityRecord(
   tenantId: string,
   entityTable: string,
   entityId: string,
@@ -177,7 +177,7 @@ export async function updateEntityWithExtensions(
 /**
  * Delete entity
  */
-export async function deleteEntity(
+export async function deleteEntityRecord(
   tenantId: string,
   entityTable: string,
   entityId: string

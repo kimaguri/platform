@@ -1,6 +1,6 @@
-import { getAdapterForTenant } from '../../../connectors/registry/connector-registry';
-import type { Adapter } from '../../../connectors/base';
-import type { ExtensionFieldDefinition } from '../../tenant-management/src/extensible-fields';
+import { getAdapterForTenant } from '../../../../connectors/registry/connector-registry';
+import type { Adapter } from '../../../../connectors/base';
+import type { ExtensionFieldDefinition } from '../../../tenant-management/src/extensible-fields';
 
 // Import validation and error handling
 import {
@@ -9,7 +9,7 @@ import {
   sanitizeFieldValue,
   type ValidationResult,
   type ValidationOptions,
-} from './validation';
+} from '../validation';
 import {
   handleExtensibleFieldsError,
   createValidationError,
@@ -202,24 +202,28 @@ function attemptValidationRecovery(
  * Интегрированная система валидации с обработкой ошибок
  */
 export function parseExtensionFieldValues(
-  rawValues: Record<string, any>,
-  fieldDefinitions: ExtensionFieldDefinition[],
+  customFieldsValues: Record<string, any>,
+  fieldDefinitionsMetadata: ExtensionFieldDefinition[],
   options: ValidationOptions = {}
 ): ExtensionFieldValue {
   try {
     // Санитизация входных данных
-    const sanitizedValues = sanitizeInputValues(rawValues, fieldDefinitions);
+    const sanitizedValues = sanitizeInputValues(customFieldsValues, fieldDefinitionsMetadata);
 
     // Применение значений по умолчанию
-    const valuesWithDefaults = applyDefaultValues(sanitizedValues, fieldDefinitions);
+    const valuesWithDefaults = applyDefaultValues(sanitizedValues, fieldDefinitionsMetadata);
 
     // Комплексная валидация
-    const validationResult = validateExtensionFields(valuesWithDefaults, fieldDefinitions, options);
+    const validationResult = validateExtensionFields(
+      valuesWithDefaults,
+      fieldDefinitionsMetadata,
+      options
+    );
 
     // Если есть ошибки валидации, обрабатываем их
     if (!validationResult.isValid) {
       const context: ErrorContext = {
-        metadata: { fieldDefinitions, rawValues },
+        metadata: { fieldDefinitionsMetadata, customFieldsValues },
       };
 
       const extensibleErrors = convertValidationErrorsToExtensibleErrors(
@@ -231,7 +235,7 @@ export function parseExtensionFieldValues(
       const recoveredValues = attemptValidationRecovery(
         valuesWithDefaults,
         validationResult,
-        fieldDefinitions
+        fieldDefinitionsMetadata
       );
 
       if (recoveredValues) {
@@ -254,7 +258,7 @@ export function parseExtensionFieldValues(
     return valuesWithDefaults;
   } catch (error) {
     const context: ErrorContext = {
-      metadata: { fieldDefinitions, rawValues, options },
+      metadata: { fieldDefinitionsMetadata, customFieldsValues, options },
     };
 
     const handlingResult = handleExtensibleFieldsError(
@@ -359,32 +363,35 @@ function validateFieldValue(value: any, rules: Record<string, any>, fieldName: s
 export async function getEntityWithExtensions(
   tenantId: string,
   entityTable: string,
-  entityId: string
+  recordId: string
 ): Promise<EntityWithExtensions | null> {
   // Получаем метаданные полей от Tenant Management Service
-  const fieldDefinitions = await getFieldDefinitionsFromTenantService(tenantId, entityTable);
+  const fieldDefinitionsMetadata = await getFieldDefinitionsFromTenantService(
+    tenantId,
+    entityTable
+  );
 
   // Получаем адаптер для работы с тенантской БД
   const adapter = await getTenantAdapter(tenantId, entityTable);
 
   // Получаем базовую сущность
-  const baseEntity = await adapter.queryOne(entityId);
-  if (!baseEntity) {
+  const baseRecordData = await adapter.queryOne(recordId);
+  if (!baseRecordData) {
     return null;
   }
 
   // Извлекаем расширяемые поля из JSONB
-  const customFields = baseEntity.custom_fields || {};
+  const customFieldsValues = baseRecordData.custom_fields || {};
 
   // TODO: Добавить поддержку extension_table_values для холодных полей
   // const coldFields = await getColdFields(tenantId, entityTable, entityId);
   // const allExtensionFields = { ...customFields, ...coldFields };
 
   // Парсируем и валидируем поля
-  const extensions = parseExtensionFieldValues(customFields, fieldDefinitions);
+  const extensions = parseExtensionFieldValues(customFieldsValues, fieldDefinitionsMetadata);
 
   return {
-    ...baseEntity,
+    ...baseRecordData,
     extensions,
   };
 }
