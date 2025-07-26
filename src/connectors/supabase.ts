@@ -24,9 +24,13 @@ export default function createSupabaseAdapter<T = any>(
     },
 
     async query(params: QueryParams = {}): Promise<T[]> {
-      let query = client
-        .from(config.table)
-        .select(Array.isArray(params.select) ? params.select.join(',') : params.select || '*');
+      // Используем meta.select если доступен, иначе fallback на params.select или '*'
+      const selectClause = params.meta?.select || params.select || '*';
+
+      // Обрабатываем select - если массив, соединяем через запятую
+      const selectString = Array.isArray(selectClause) ? selectClause.join(',') : selectClause;
+
+      let query = client.from(config.table).select(selectString);
 
       // Apply filters
       if (params.filter) {
@@ -53,6 +57,7 @@ export default function createSupabaseAdapter<T = any>(
       }
 
       const { data, error } = await query;
+
       if (error) throw new Error(`Supabase query error: ${error.message}`);
       return (data || []) as T[];
     },

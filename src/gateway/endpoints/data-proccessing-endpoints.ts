@@ -164,12 +164,20 @@ export const listEntityRecords = api(
     page,
     entity,
     status,
+    select,
+    filters,
+    sorters,
+    meta,
   }: {
     limit?: Query<number>;
     offset?: Query<number>;
     page?: Query<number>;
     entity: string;
     status?: Query<'draft' | 'published' | 'archived'>;
+    select?: Query<string>;
+    filters?: Query<string>;
+    sorters?: Query<string>;
+    meta?: Query<string>;
   }): Promise<ApiResponse<ContentItem[]>> => {
     const authData = getAuthData() as AuthData;
 
@@ -193,6 +201,10 @@ export const listEntityRecords = api(
         entity,
         limit: finalLimit,
         offset: finalOffset,
+        select,
+        filters,
+        sorters,
+        meta,
       });
 
       // Check if the result contains an error

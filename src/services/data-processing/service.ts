@@ -90,6 +90,10 @@ export async function getEntityList(
     offset?: number;
     filters?: ExtensionFieldsFilter[];
     sorters?: ExtensionFieldsSorter[];
+    meta?: {
+      select?: string;
+      [key: string]: any;
+    };
   } = {}
 ): Promise<ApiResponse<{ data: EntityWithExtensions[]; total: number }>> {
   try {

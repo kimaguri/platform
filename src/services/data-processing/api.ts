@@ -35,45 +35,48 @@ export type RawMap = Record<string, unknown>;
 
 /**
  * Encore-compatible payload type for entities with extensions
- * Uses __raw to capture unknown fields, avoiding index signature issues
+ * Простая структура: data содержит все поля сущности, extensions - обработанные расширяемые поля
  */
-export type Payload<TAdditional extends RawMap = RawMap> = BaseFields & {
-  extensions: ExtensionFieldValue;
-  __raw?: TAdditional;
+export type Payload = {
+  data: Record<string, any>; // Все поля сущности как есть
+  extensions: ExtensionFieldValue; // Обработанные расширяемые поля
 };
 
 // ===== CONVERTER FUNCTIONS =====
 
 /**
  * Convert EntityWithExtensions to Encore-compatible Payload
+ * Простая структура: помещаем всю сущность в data, extensions отдельно
  */
 export function toPayload(entity: EntityWithExtensions): Payload {
-  const { id, created_at, updated_at, name, title, description, status, type, extensions, ...raw } =
-    entity as any;
+  console.log('[DEBUG toPayload] Input entity:', JSON.stringify(entity, null, 2));
+  
+  const { extensions, ...entityData } = entity as any;
 
-  return {
-    id,
-    created_at,
-    updated_at,
-    name,
-    title,
-    description,
-    status,
-    type,
-    extensions,
-    __raw: Object.keys(raw).length > 0 ? raw : undefined,
+  console.log('[DEBUG toPayload] Entity data:', JSON.stringify(entityData, null, 2));
+  console.log('[DEBUG toPayload] Extensions:', JSON.stringify(extensions, null, 2));
+
+  // Простая структура: все поля сущности в data, extensions отдельно
+  const result = {
+    data: entityData, // Все поля сущности как есть
+    extensions: extensions || {}, // Обработанные расширяемые поля
   };
+  
+  console.log('[DEBUG toPayload] Final result:', JSON.stringify(result, null, 2));
+  return result;
 }
 
 /**
  * Convert Payload back to EntityWithExtensions for internal use
+ * Простая структура: объединяем data и extensions
  */
 export function fromPayload(payload: Payload): EntityWithExtensions {
-  const { __raw, ...baseFields } = payload;
+  const { data, extensions } = payload;
 
+  // Простое объединение: все поля из data + extensions
   return {
-    ...baseFields,
-    ...(__raw || {}),
+    ...data,
+    extensions,
   } as EntityWithExtensions;
 }
 
@@ -116,7 +119,10 @@ export const getEntityRecordData = api(
     );
 
     if (result.error) {
-      return result as ApiResponse<Payload>;
+      return {
+        error: result.error,
+        message: result.message,
+      };
     }
 
     return {
@@ -138,12 +144,16 @@ export const getEntityList = api(
     offset,
     filters,
     sorters,
+    select,
+    meta,
   }: {
     entityTable: string;
     limit?: Query<number>;
     offset?: Query<number>;
     filters?: Query<string>; // JSON string with ExtensionFieldsFilter[]
     sorters?: Query<string>; // JSON string with ExtensionFieldsSorter[]
+    select?: Query<string>; // Select clause for nested queries
+    meta?: Query<string>; // JSON string with meta parameters
   }): Promise<
     ApiResponse<{
       data: Payload[];
@@ -156,6 +166,7 @@ export const getEntityList = api(
     // Парсим фильтры и сортировку из JSON строк
     let parsedFilters: ExtensionFieldsFilter[] = [];
     let parsedSorters: ExtensionFieldsSorter[] = [];
+    let parsedMeta: { select?: string; [key: string]: any } | undefined;
 
     try {
       if (filters) {
@@ -164,11 +175,21 @@ export const getEntityList = api(
       if (sorters) {
         parsedSorters = JSON.parse(sorters);
       }
+      if (meta) {
+        parsedMeta = JSON.parse(meta);
+      }
     } catch (error) {
       return {
-        error: 'Invalid filters or sorters format. Expected JSON string.',
+        error: 'Invalid filters, sorters, or meta format. Expected JSON string.',
         message: 'Invalid query parameters',
       };
+    }
+
+    // Если передан select параметр, используем его через meta.select
+    // Это позволяет фронтенду отправлять select как обычный query-параметр
+    if (select && !parsedMeta?.select) {
+      parsedMeta = parsedMeta || {};
+      parsedMeta.select = select;
     }
 
     const result = await DataProcessingService.getEntityList(authData.tenantId, entityTable, {
@@ -231,7 +252,10 @@ export const createEntityRecord = api(
     );
 
     if (result.error) {
-      return result as ApiResponse<Payload>;
+      return {
+        error: result.error,
+        message: result.message,
+      };
     }
 
     return {
@@ -271,7 +295,10 @@ export const updateEntityRecord = api(
     );
 
     if (result.error) {
-      return result as ApiResponse<Payload>;
+      return {
+        error: result.error,
+        message: result.message,
+      };
     }
 
     return {

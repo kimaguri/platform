@@ -2,7 +2,12 @@ import { api, Query } from 'encore.dev/api';
 import { getAuthData } from '~encore/auth';
 import type { AuthData } from '../../gateway/auth';
 import type { ApiResponse } from '../../lib/types';
-import type { UserProfile, UpdateUserRequest, UpdateRoleRequest } from './src/models/user';
+import type {
+  UserProfile,
+  UpdateUserRequest,
+  UpdateRoleRequest,
+  AppBootstrapData,
+} from './src/models/user';
 import * as UserService from './service';
 
 /**
@@ -96,19 +101,21 @@ export const login = api(
     tenantId: string;
     email: string;
     password: string;
-  }): Promise<ApiResponse<{
-    token: string;
-    refreshToken?: string;
-    expiresAt: string;
-    user: {
-      id: string;
-      email: string;
-      firstName?: string;
-      lastName?: string;
-      displayName?: string;
-      role: string;
-    };
-  }>> => {
+  }): Promise<
+    ApiResponse<{
+      token: string;
+      refreshToken?: string;
+      expiresAt: string;
+      user: {
+        id: string;
+        email: string;
+        firstName?: string;
+        lastName?: string;
+        displayName?: string;
+        role: string;
+      };
+    }>
+  > => {
     return UserService.login(params);
   }
 );
@@ -126,19 +133,33 @@ export const register = api(
     firstName?: string;
     lastName?: string;
     displayName?: string;
-  }): Promise<ApiResponse<{
-    token: string;
-    refreshToken?: string;
-    expiresAt: string;
-    user: {
-      id: string;
-      email: string;
-      firstName?: string;
-      lastName?: string;
-      displayName?: string;
-      role: string;
-    };
-  }>> => {
+  }): Promise<
+    ApiResponse<{
+      token: string;
+      refreshToken?: string;
+      expiresAt: string;
+      user: {
+        id: string;
+        email: string;
+        firstName?: string;
+        lastName?: string;
+        displayName?: string;
+        role: string;
+      };
+    }>
+  > => {
     return UserService.register(params);
+  }
+);
+
+/**
+ * Get application bootstrap data
+ * Loads all essential data needed for app initialization in one request
+ */
+export const getAppBootstrapData = api(
+  { auth: true, method: 'GET', path: '/bootstrap' },
+  async (): Promise<ApiResponse<AppBootstrapData>> => {
+    const authData = getAuthData() as AuthData;
+    return UserService.getAppBootstrapData(authData.tenantId, authData.userID);
   }
 );

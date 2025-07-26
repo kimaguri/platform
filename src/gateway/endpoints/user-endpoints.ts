@@ -3,6 +3,72 @@ import { getAuthData } from '~encore/auth';
 import type { AuthData } from '../auth';
 import { userManagementClient, type ApiResponse } from '../utils/service-clients';
 
+// Bootstrap data interfaces
+interface AppBootstrapData {
+  user: {
+    id: string;
+    full_name: string;
+    organization_id: string;
+    position_id: string;
+    position: {
+      id: string;
+      name: string;
+      position_role: {
+        role_id: string;
+        role: {
+          id: string;
+          code: string;
+          name: string;
+          description?: string;
+          inherits?: string[];
+          restrict_assign_activity: boolean;
+        };
+      }[];
+    };
+  };
+  dictionaries: {
+    id: string;
+    code: string;
+    name: string;
+    description?: string;
+    is_active: boolean;
+    dictionary_value: {
+      id: string;
+      dictionary_id: string;
+      value: string;
+      label?: string;
+      description?: string;
+      sort_order?: number;
+      is_active: boolean;
+    }[];
+  }[];
+  configParameters: {
+    id: string;
+    key: string;
+    value: string;
+    type: 'string' | 'number' | 'boolean' | 'json';
+    description?: string;
+    is_active: boolean;
+  }[];
+  resources: {
+    id: string;
+    code: string;
+    name: string;
+    description?: string;
+    resource_type: string;
+    is_active: boolean;
+  }[];
+  permissions: {
+    id: string;
+    code: string;
+    name: string;
+    description?: string;
+    resource_id: string;
+    action: string;
+    is_active: boolean;
+  }[];
+}
+
 // Request/Response interfaces
 interface LoginRequest {
   email: string;
@@ -268,6 +334,31 @@ export const listUsers = api(
     } catch (error) {
       throw new Error(
         `Failed to list users: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+);
+
+/**
+ * Get application bootstrap data
+ * Loads all essential data needed for app initialization in one request
+ */
+export const getAppBootstrap = api(
+  { method: 'GET', path: '/api/v1/bootstrap', expose: true, auth: true },
+  async (): Promise<ApiResponse<AppBootstrapData>> => {
+    const authData = getAuthData() as AuthData;
+
+    try {
+      // Proxy to user-management service
+      const result = await userManagementClient.getAppBootstrap();
+
+      return {
+        data: result.data,
+        message: result.message || 'Bootstrap data loaded successfully',
+      };
+    } catch (error) {
+      throw new Error(
+        `Failed to load bootstrap data: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
     }
   }

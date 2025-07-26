@@ -9,6 +9,10 @@ export interface QueryParams {
   offset?: number;
   select?: string | string[];
   orderBy?: { field: string; direction: 'asc' | 'desc' }[];
+  meta?: {
+    select?: string;
+    [key: string]: any;
+  };
 }
 
 export interface Adapter<T = any> {

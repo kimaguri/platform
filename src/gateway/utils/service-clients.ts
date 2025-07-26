@@ -130,6 +130,17 @@ export const userManagementClient = {
     const { userID, ...updateData } = params;
     return await userManagementClient.updateMyProfile(updateData);
   },
+
+  /**
+   * Get application bootstrap data
+   * Loads all essential data needed for app initialization in one request
+   */
+  getAppBootstrap: async () => {
+    if (userManagementService?.getAppBootstrapData) {
+      return await userManagementService.getAppBootstrapData();
+    }
+    throw new Error('User management service not available');
+  },
 };
 
 /**
@@ -226,12 +237,24 @@ export const dataProcessingClient = {
   /**
    * List entities with pagination
    */
-  listEntityRecords: async (params: { entity: string; limit?: number; offset?: number }) => {
+  listEntityRecords: async (params: {
+    entity: string;
+    limit?: number;
+    offset?: number;
+    select?: string;
+    filters?: string;
+    sorters?: string;
+    meta?: string;
+  }) => {
     if (dataProcessingService?.getEntityList) {
       return await dataProcessingService.getEntityList({
         entityTable: params.entity,
         limit: params.limit,
         offset: params.offset,
+        select: params.select,
+        filters: params.filters,
+        sorters: params.sorters,
+        meta: params.meta,
       });
     }
     throw new Error('Content management service not available');

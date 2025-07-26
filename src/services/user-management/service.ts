@@ -1,5 +1,14 @@
 import type { ApiResponse } from '../../lib/types';
-import type { UserProfile, UpdateUserRequest } from './src/models/user';
+import type {
+  UserProfile,
+  UpdateUserRequest,
+  AppBootstrapData,
+  EmployeeData,
+  Dictionary,
+  ConfigParameter,
+  Resource,
+  Permission,
+} from './src/models/user';
 import {
   queryResource,
   getResource,
@@ -493,6 +502,122 @@ export async function register(params: {
     return {
       error: error instanceof Error ? error.message : 'Registration failed',
       message: 'Registration failed',
+    };
+  }
+}
+
+/**
+ * Get application bootstrap data
+ * Loads all essential data needed for app initialization in one request
+ */
+export async function getAppBootstrapData(
+  tenantId: string,
+  userId: string
+): Promise<ApiResponse<AppBootstrapData>> {
+  try {
+    // Параллельная загрузка всех необходимых данных
+    const [userResult, dictionariesResult, resourcesResult, permissionsResult] =
+      await Promise.allSettled([
+        // 1. Загрузка данных пользователя с ролями и позициями
+        queryResource<EmployeeData>(tenantId, 'employee', {
+          filter: { user_id: userId },
+          limit: 1,
+          meta: {
+            select: `
+            id,
+            full_name,
+            organization_id,
+            position_id,
+            user_id,
+            position (
+              id,
+              name,
+              position_role (
+                id,
+                position_id,
+                role_id,
+                role (
+                  id,
+                  code,
+                  name,
+                  description,
+                  inherits,
+                  restrict_assign_activity
+                )
+              )
+            )
+          `,
+          },
+        }),
+
+        // 2. Загрузка справочников с вложенными значениями
+        queryResource<Dictionary>(tenantId, 'dictionary', {
+          meta: {
+            select: '*, dictionary_value(*)',
+          },
+        }),
+
+        // 3. Загрузка ресурсов системы разрешений (глобальные)
+        queryResource<Resource>(tenantId, 'resource', {
+          meta: {
+            select: '*, parent:resource(id, code, name)',
+          },
+        }),
+
+        // 4. Загрузка разрешений (глобальные)
+        queryResource<Permission>(tenantId, 'permission', {
+          meta: {
+            select: '*, resource:resource(id, code, name, description)',
+          },
+        }),
+      ]);
+
+    const userData = userResult.status === 'fulfilled' ? userResult.value[0] : null;
+    const dictionaries = dictionariesResult.status === 'fulfilled' ? dictionariesResult.value : [];
+    const resources = resourcesResult.status === 'fulfilled' ? resourcesResult.value : [];
+    const permissions = permissionsResult.status === 'fulfilled' ? permissionsResult.value : [];
+
+    if (userData) {
+      console.log('[Bootstrap] User position_role data:', userData.position?.position_role);
+    }
+
+    // Проверяем, что пользователь найден
+    if (!userData) {
+      return {
+        error: 'User not found',
+        message: 'User data not found',
+      };
+    }
+
+    // Собираем ошибки, если они есть
+    const errors: string[] = [];
+    if (userResult.status === 'rejected') errors.push(`User data: ${userResult.reason}`);
+    if (dictionariesResult.status === 'rejected')
+      errors.push(`Dictionaries: ${dictionariesResult.reason}`);
+    if (resourcesResult.status === 'rejected') errors.push(`Resources: ${resourcesResult.reason}`);
+    if (permissionsResult.status === 'rejected')
+      errors.push(`Permissions: ${permissionsResult.reason}`);
+
+    // Формируем ответ
+    const bootstrapData: AppBootstrapData = {
+      user: userData,
+      dictionaries,
+      configParameters: [], // Таблица config_parameters не существует в БД
+      resources,
+      permissions,
+    };
+
+    return {
+      data: bootstrapData,
+      message:
+        errors.length > 0
+          ? `Bootstrap data loaded with warnings: ${errors.join('; ')}`
+          : 'Bootstrap data loaded successfully',
+    };
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : 'Failed to load bootstrap data',
+      message: 'Failed to load bootstrap data',
     };
   }
 }

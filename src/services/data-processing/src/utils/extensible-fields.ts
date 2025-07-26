@@ -99,11 +99,6 @@ async function getFieldDefinitionsFromTenantService(
     // TODO: Заменить на реальный RPC вызов к Tenant Management Service
     // const response = await tenantManagementClient.getFieldDefinitions({ tenantId, entityTable });
 
-    // Временная заглушка - в реальности будет RPC вызов
-    console.log(
-      `[ExtensibleFields] Loading field definitions for ${tenantId}:${entityTable} from Tenant Management Service`
-    );
-
     // Возвращаем пустой массив пока нет интеграции с Tenant Management
     const definitions: ExtensionFieldDefinition[] = [];
 
@@ -155,6 +150,22 @@ function sanitizeInputValues(
   }
 
   return sanitized;
+}
+
+/**
+ * Нормализация полей сущности - преобразование null значений в пустые строки
+ */
+function normalizeEntityFields(entity: any): any {
+  const normalized = { ...entity };
+
+  // Преобразуем все null и undefined значения в пустые строки
+  Object.keys(normalized).forEach((key) => {
+    if (normalized[key] === null || normalized[key] === undefined) {
+      normalized[key] = '';
+    }
+  });
+
+  return normalized;
 }
 
 /**
@@ -407,9 +418,13 @@ export async function getEntitiesWithExtensions(
     offset?: number;
     filters?: ExtensionFieldsFilter[];
     sorters?: ExtensionFieldsSorter[];
+    meta?: {
+      select?: string;
+      [key: string]: any;
+    };
   } = {}
 ): Promise<{ data: EntityWithExtensions[]; total: number }> {
-  const { limit = 50, offset = 0, filters = [], sorters = [] } = options;
+  const { limit = 50, offset = 0, filters = [], sorters = [], meta } = options;
 
   // Получаем метаданные полей от Tenant Management Service
   const fieldDefinitions = await getFieldDefinitionsFromTenantService(tenantId, entityTable);
@@ -430,6 +445,7 @@ export async function getEntitiesWithExtensions(
     }),
     limit,
     offset,
+    meta,
   });
 
   // Получаем общее количество записей
@@ -437,13 +453,27 @@ export async function getEntitiesWithExtensions(
 
   // Обрабатываем результаты
   const entitiesWithExtensions = entities.map((entity: any) => {
+    // Временное логирование для отладки
+    console.log('[DEBUG] Raw entity from DB:', JSON.stringify(entity, null, 2));
+    
     const customFields = entity.custom_fields || {};
     const extensions = parseExtensionFieldValues(customFields, fieldDefinitions);
 
-    return {
-      ...entity,
+    // Нормализуем базовые поля - преобразуем null в строки для строковых полей
+    const normalizedEntity = normalizeEntityFields(entity);
+    
+    console.log('[DEBUG] Normalized entity:', JSON.stringify(normalizedEntity, null, 2));
+    console.log('[DEBUG] Extensions:', JSON.stringify(extensions, null, 2));
+
+    // Возвращаем всю нормализованную сущность с extensions
+    // Это гарантирует, что все динамические поля попадут в toPayload
+    const result = {
+      ...normalizedEntity,
       extensions,
     };
+    
+    console.log('[DEBUG] Final result:', JSON.stringify(result, null, 2));
+    return result;
   });
 
   return {

@@ -8,11 +8,15 @@ export interface ConnectionConfig {
 }
 
 export interface QueryParams {
-  select?: string;
+  select?: string | string[];
   filter?: Record<string, any>;
   limit?: number;
   offset?: number;
-  orderBy?: string;
+  orderBy?: string | { field: string; direction: 'asc' | 'desc' }[];
+  meta?: {
+    select?: string;
+    [key: string]: any;
+  };
 }
 
 export interface ResourceConfig {
