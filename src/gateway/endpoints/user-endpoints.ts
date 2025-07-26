@@ -68,9 +68,15 @@ export const login = api(
         password: data.password,
       });
 
+      // Check if the result contains an error
+      if ('error' in result && result.error) {
+        throw new Error(result.error);
+      }
+
+      // Return successful result
       return {
-        data: result,
-        message: 'Login successful',
+        data: result.data,
+        message: result.message || 'Login successful',
       };
     } catch (error) {
       throw new Error(`Login failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -94,9 +100,15 @@ export const register = api(
         displayName: data.displayName,
       });
 
+      // Check if the result contains an error
+      if ('error' in result && result.error) {
+        throw new Error(result.error);
+      }
+
+      // Return successful result
       return {
-        data: result,
-        message: 'Registration successful',
+        data: result.data,
+        message: result.message || 'Registration successful',
       };
     } catch (error) {
       throw new Error(
