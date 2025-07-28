@@ -15,20 +15,6 @@ import type {
 // ===== ENCORE-COMPATIBLE TYPES =====
 
 /**
- * Base fields that all entities have
- */
-export interface BaseFields {
-  id: string;
-  created_at?: string;
-  updated_at?: string;
-  name?: string;
-  title?: string;
-  description?: string;
-  status?: string;
-  type?: string;
-}
-
-/**
  * Raw map for unknown additional fields
  */
 export type RawMap = Record<string, unknown>;
@@ -38,32 +24,21 @@ export type RawMap = Record<string, unknown>;
  * Простая структура: data содержит все поля сущности, extensions - обработанные расширяемые поля
  */
 export type Payload = {
-  data: Record<string, any>; // Все поля сущности как есть
+  baseFields: Record<string, any>; // Все поля сущности как есть
   extensions: ExtensionFieldValue; // Обработанные расширяемые поля
 };
-
-// ===== CONVERTER FUNCTIONS =====
 
 /**
  * Convert EntityWithExtensions to Encore-compatible Payload
  * Простая структура: помещаем всю сущность в data, extensions отдельно
  */
 export function toPayload(entity: EntityWithExtensions): Payload {
-  console.log('[DEBUG toPayload] Input entity:', JSON.stringify(entity, null, 2));
-  
-  const { extensions, ...entityData } = entity as any;
+  const { extensions, ...baseFields } = entity as any;
 
-  console.log('[DEBUG toPayload] Entity data:', JSON.stringify(entityData, null, 2));
-  console.log('[DEBUG toPayload] Extensions:', JSON.stringify(extensions, null, 2));
-
-  // Простая структура: все поля сущности в data, extensions отдельно
-  const result = {
-    data: entityData, // Все поля сущности как есть
-    extensions: extensions || {}, // Обработанные расширяемые поля
+  return {
+    baseFields,
+    extensions,
   };
-  
-  console.log('[DEBUG toPayload] Final result:', JSON.stringify(result, null, 2));
-  return result;
 }
 
 /**
@@ -71,11 +46,11 @@ export function toPayload(entity: EntityWithExtensions): Payload {
  * Простая структура: объединяем data и extensions
  */
 export function fromPayload(payload: Payload): EntityWithExtensions {
-  const { data, extensions } = payload;
+  const { baseFields, extensions } = payload;
 
   // Простое объединение: все поля из data + extensions
   return {
-    ...data,
+    ...baseFields,
     extensions,
   } as EntityWithExtensions;
 }
@@ -197,6 +172,7 @@ export const getEntityList = api(
       offset: offset || 0,
       filters: parsedFilters,
       sorters: parsedSorters,
+      meta: parsedMeta,
     });
 
     if (result.error) {
