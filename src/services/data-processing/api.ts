@@ -218,14 +218,25 @@ export const createEntityRecord = api(
   }): Promise<ApiResponse<Payload>> => {
     const authData = getAuthData() as AuthData;
 
+    // Логирование входящих данных для отладки
+    console.log('[CreateEntity] Received data:', {
+      entityTable,
+      entityData,
+      extensionFieldsData,
+      tenantId: authData.tenantId,
+      userID: authData.userID
+    });
+
     // Преобразуем Payload обратно в внутренний формат
     const internalEntityData = fromPayload(entityData);
+    console.log('[CreateEntity] Internal entity data:', internalEntityData);
 
     const result = await DataProcessingService.createEntityRecord(
       authData.tenantId,
       entityTable,
       internalEntityData,
-      extensionFieldsData || {}
+      extensionFieldsData || {},
+      authData.jwtToken
     );
 
     if (result.error) {
@@ -299,7 +310,16 @@ export const deleteEntityRecord = api(
     recordId: string;
   }): Promise<ApiResponse<boolean>> => {
     const authData = getAuthData() as AuthData;
-    return DataProcessingService.deleteEntityRecord(authData.tenantId, entityTable, recordId);
+    
+    console.log('[DeleteEntity] Received DELETE request:', {
+      entityTable,
+      recordId,
+      tenantId: authData.tenantId,
+      userID: authData.userID,
+      hasJwtToken: !!authData.jwtToken
+    });
+    
+    return DataProcessingService.deleteEntityRecord(authData.tenantId, entityTable, recordId, authData.jwtToken);
   }
 );
 

@@ -143,10 +143,19 @@ export const deleteEntityRecord = api(
 
     try {
       // Proxy to data-processing service
-      await dataProcessingClient.deleteEntityRecord({
-        entity,
-        id,
+      console.log('[Gateway DELETE] Calling data-processing with:', { entityTable: entity, recordId: id });
+      
+      const result = await dataProcessingClient.deleteEntityRecord({
+        entityTable: entity,
+        recordId: id,
       });
+      
+      console.log('[Gateway DELETE] Result from data-processing:', result);
+      
+      // Проверяем, есть ли ошибка в ответе от data-processing
+      if (result.error) {
+        throw new Error(result.error);
+      }
 
       return {
         data: { success: true },

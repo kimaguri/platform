@@ -99,11 +99,14 @@ export function getAdminAdapter(table: string): Adapter {
 /**
  * Get adapter for tenant - integrates with existing connector-type system
  */
-export async function getAdapterForTenant(tenantId: string, table: string): Promise<Adapter> {
+export async function getAdapterForTenant(tenantId: string, table: string, jwtToken?: string): Promise<Adapter> {
+  console.log('[ConnectorRegistry] getAdapterForTenant called with:', { tenantId, table, hasJwtToken: !!jwtToken });
+  
   const cacheKey = `${tenantId}:${table}`;
 
-  // Check cache first
-  if (registryState.cache.has(cacheKey)) {
+  // Check cache first - НЕ используем кеш для адаптеров с JWT токеном
+  if (!jwtToken && registryState.cache.has(cacheKey)) {
+    console.log('[ConnectorRegistry] Using cached adapter (no JWT)');
     return registryState.cache.get(cacheKey)!;
   }
 
@@ -128,6 +131,7 @@ export async function getAdapterForTenant(tenantId: string, table: string): Prom
     const adapterConfig: AdapterConfig & { table: string } = {
       type: connectorType as 'supabase' | 'postgres' | 'mongodb',
       table,
+      jwtToken, // Передаем JWT токен для аутентификации операций записи
       // Supabase specific config
       supabaseUrl: tenantConfig.SUPABASE_URL,
       supabaseKey: tenantConfig.ANON_KEY,

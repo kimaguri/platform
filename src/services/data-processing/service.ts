@@ -118,14 +118,16 @@ export async function createEntityRecord(
   tenantId: string,
   entityTable: string,
   entityData: Record<string, any>,
-  extensionFields: ExtensionFieldValue
+  extensionFields: ExtensionFieldValue,
+  jwtToken?: string
 ): Promise<ApiResponse<EntityWithExtensions>> {
   try {
     const entity = await createEntityWithExtensionsFromModule(
       tenantId,
       entityTable,
       entityData,
-      extensionFields
+      extensionFields,
+      jwtToken
     );
 
     return {
@@ -184,11 +186,19 @@ export async function updateEntityRecord(
 export async function deleteEntityRecord(
   tenantId: string,
   entityTable: string,
-  entityId: string
+  entityId: string,
+  jwtToken?: string
 ): Promise<ApiResponse<boolean>> {
+  console.log('[DeleteEntityRecord] Called with parameters:', {
+    tenantId,
+    entityTable,
+    entityId,
+    hasJwtToken: !!jwtToken
+  });
+  
   try {
     // Get adapter for tenant database
-    const adapter = await getAdapterForTenant(tenantId, entityTable);
+    const adapter = await getAdapterForTenant(tenantId, entityTable, jwtToken);
 
     // Delete the entity
     const success = await adapter.delete(entityId);
@@ -205,6 +215,19 @@ export async function deleteEntityRecord(
       message: `Deleted ${entityTable} entity`,
     };
   } catch (error) {
+    console.error('[DeleteEntityRecord] Error:', error);
+    
+    // Обрабатываем ошибку foreign key constraint
+    if (error instanceof Error && error.message.includes('violates foreign key constraint')) {
+      const match = error.message.match(/on table "(\w+)"/);  
+      const referencingTable = match ? match[1] : 'связанных записей';
+      
+      return {
+        error: `Невозможно удалить запись, так как на неё ссылаются записи в таблице "${referencingTable}". Сначала удалите связанные записи.`,
+        message: 'Ошибка целостности данных',
+      };
+    }
+    
     return {
       error: error instanceof Error ? error.message : 'Failed to delete entity',
       message: 'Failed to delete entity',

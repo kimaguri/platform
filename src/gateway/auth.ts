@@ -16,6 +16,7 @@ export interface AuthData {
   userEmail?: string;
   userRole?: string;
   tokenType: 'jwt' | 'api_key';
+  jwtToken?: string; // JWT токен для передачи в адаптеры для операций записи
 }
 
 /**
@@ -63,7 +64,10 @@ export const auth = authHandler<AuthParams, AuthData>(
 
     try {
       if (tokenType === 'jwt') {
-        return await validateJWTToken(token, tenantId);
+        const authData = await validateJWTToken(token, tenantId);
+        // Добавляем JWT токен в AuthData для передачи в адаптеры
+        authData.jwtToken = token;
+        return authData;
       } else {
         return await validateApiKey(token, tenantId);
       }

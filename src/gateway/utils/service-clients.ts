@@ -339,7 +339,7 @@ export const dataProcessingClient = {
   /**
    * Delete entity by ID
    */
-  deleteEntityRecord: async (params: { entity: string; id: string }) => {
+  deleteEntityRecord: async (params: { entityTable: string; recordId: string }) => {
     if (dataProcessingService?.deleteEntityRecord) {
       return await dataProcessingService.deleteEntityRecord(params);
     }

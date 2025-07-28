@@ -121,8 +121,8 @@ async function getFieldDefinitionsFromTenantService(
 /**
  * Получение адаптера для работы с тенантской БД
  */
-async function getTenantAdapter(tenantId: string, entityTable: string): Promise<Adapter> {
-  return getAdapterForTenant(tenantId, entityTable);
+async function getTenantAdapter(tenantId: string, entityTable: string, jwtToken?: string): Promise<Adapter> {
+  return getAdapterForTenant(tenantId, entityTable, jwtToken);
 }
 
 /**
@@ -489,8 +489,17 @@ export async function createEntityWithExtensions(
   tenantId: string,
   entityTable: string,
   entityData: Record<string, any>,
-  extensionFields: ExtensionFieldValue
+  extensionFields: ExtensionFieldValue,
+  jwtToken?: string
 ): Promise<EntityWithExtensions> {
+  console.log('[ExtensibleFields] createEntityWithExtensions called with:', {
+    tenantId,
+    entityTable,
+    hasJwtToken: !!jwtToken,
+    entityDataKeys: Object.keys(entityData),
+    extensionFieldsKeys: Object.keys(extensionFields)
+  });
+
   // Получаем метаданные полей от Tenant Management Service
   const fieldDefinitions = await getFieldDefinitionsFromTenantService(tenantId, entityTable);
 
@@ -498,14 +507,22 @@ export async function createEntityWithExtensions(
   const validatedExtensions = parseExtensionFieldValues(extensionFields, fieldDefinitions);
 
   // Получаем адаптер для работы с тенантской БД
-  const adapter = await getTenantAdapter(tenantId, entityTable);
+  console.log('[ExtensibleFields] Getting adapter with JWT token:', !!jwtToken);
+  const adapter = await getTenantAdapter(tenantId, entityTable, jwtToken);
 
   // Создаем сущность с расширяемыми полями в JSONB
-  const newEntity = await adapter.insert({
+  const insertData = {
     ...entityData,
     custom_fields: validatedExtensions,
-    tenant_id: tenantId,
+  };
+  
+  console.log('[ExtensibleFields] About to call adapter.insert with:', {
+    insertData,
+    adapterType: typeof adapter,
+    adapterMethods: Object.keys(adapter)
   });
+  
+  const newEntity = await adapter.insert(insertData);
 
   return {
     ...newEntity,

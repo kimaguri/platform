@@ -28,6 +28,7 @@ export interface Adapter<T = any> {
 
 export interface AdapterConfig {
   type: 'supabase' | 'postgres' | 'mongodb';
+  jwtToken?: string; // JWT токен для аутентификации операций записи
   [key: string]: any;
 }
 

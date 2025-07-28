@@ -16,7 +16,35 @@ export default function createSupabaseAdapter<T = any>(
 
   return {
     async connect() {
+      console.log('[SupabaseAdapter] Connecting with config:', { 
+        hasJwtToken: !!config.jwtToken, 
+        table: config.table,
+        supabaseUrl: config.supabaseUrl?.substring(0, 30) + '...' 
+      });
+      
       client = createClient(config.supabaseUrl, config.supabaseKey);
+      
+      // Устанавливаем JWT токен для аутентификации операций записи
+      if (config.jwtToken) {
+        console.log('[SupabaseAdapter] Setting JWT session for authenticated operations');
+        
+        // Правильная структура сессии для Supabase
+        const sessionResult = await client.auth.setSession({
+          access_token: config.jwtToken,
+          refresh_token: config.jwtToken // Используем тот же токен как refresh_token
+        });
+        
+        if (sessionResult.error) {
+          console.error('[SupabaseAdapter] Failed to set session:', sessionResult.error.message);
+        } else {
+          console.log('[SupabaseAdapter] JWT session set successfully:', {
+            hasUser: !!sessionResult.data.user,
+            userId: sessionResult.data.user?.id
+          });
+        }
+      } else {
+        console.log('[SupabaseAdapter] No JWT token provided, using anon access');
+      }
     },
 
     async disconnect() {
@@ -73,13 +101,42 @@ export default function createSupabaseAdapter<T = any>(
     },
 
     async insert(data: Omit<T, 'id'>): Promise<T> {
+      // Удаляем tenant_id из данных для вставки, так как каждый тенант имеет отдельную БД
+      const { tenant_id, ...insertData } = data as any;
+      
+      // Проверяем текущего пользователя и роль
+      const { data: { user }, error: userError } = await client.auth.getUser();
+      const currentRole = await client.rpc('current_setting', { setting_name: 'role' }).single();
+      
+      console.log('[SupabaseAdapter] Attempting insert with data:', {
+        table: config.table,
+        insertData,
+        hasAuthSession: !!client.auth.getSession(),
+        currentUser: user?.id || 'none',
+        currentRole: currentRole?.data || 'unknown',
+        userError: userError?.message
+      });
+      
       const { data: result, error } = await client
         .from(config.table)
-        .insert(data)
+        .insert(insertData)
         .select()
         .single();
 
-      if (error) throw new Error(`Supabase insert error: ${error.message}`);
+      if (error) {
+        console.error('[SupabaseAdapter] Insert error:', {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint
+        });
+        throw new Error(`Supabase insert error: ${error.message}`);
+      }
+
+      console.log('[SupabaseAdapter] Insert successful:', {
+        result
+      });
+
       return result as T;
     },
 
@@ -99,10 +156,35 @@ export default function createSupabaseAdapter<T = any>(
     },
 
     async delete(id: string): Promise<boolean> {
-      const { error } = await client.from(config.table).delete().eq('id', id);
+      console.log('[SupabaseAdapter] Attempting delete with:', {
+        table: config.table,
+        id,
+        hasAuthSession: !!client.auth.getSession()
+      });
+      
+      const { data, error, count } = await client
+        .from(config.table)
+        .delete()
+        .eq('id', id)
+        .select();
 
-      if (error) throw new Error(`Supabase delete error: ${error.message}`);
-      return true;
+      if (error) {
+        console.error('[SupabaseAdapter] Delete error:', {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint
+        });
+        throw new Error(`Supabase delete error: ${error.message}`);
+      }
+      
+      const deletedCount = data?.length || 0;
+      console.log('[SupabaseAdapter] Delete result:', {
+        deletedCount,
+        deletedRecords: data
+      });
+      
+      return deletedCount > 0;
     },
 
     async count(filter: Record<string, any> = {}): Promise<number> {
