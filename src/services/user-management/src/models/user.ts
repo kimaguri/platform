@@ -170,7 +170,7 @@ export interface Role {
   id: string;
   code: string;
   name: string;
-  description?: string;
+  description?: string | null;
   inherits?: string[];
   restrict_assign_activity: boolean;
   is_active?: boolean;

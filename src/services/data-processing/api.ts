@@ -203,6 +203,7 @@ export const getEntityList = api(
 
 /**
  * Создание сущности с расширяемыми полями
+ * Использует тот же подход, что и getEntityList/getEntityRecordData
  */
 export const createEntityRecord = api(
   { auth: true, method: 'POST', path: '/entity/:entityTable' },
@@ -217,7 +218,7 @@ export const createEntityRecord = api(
   }): Promise<ApiResponse<Payload>> => {
     const authData = getAuthData() as AuthData;
 
-    // Convert Payload back to internal format
+    // Преобразуем Payload обратно в внутренний формат
     const internalEntityData = fromPayload(entityData);
 
     const result = await DataProcessingService.createEntityRecord(
@@ -243,6 +244,7 @@ export const createEntityRecord = api(
 
 /**
  * Обновление сущности с расширяемыми полями
+ * Использует тот же подход, что и getEntityRecordData
  */
 export const updateEntityRecord = api(
   { auth: true, method: 'PUT', path: '/entity/:entityTable/:recordId' },
@@ -259,7 +261,7 @@ export const updateEntityRecord = api(
   }): Promise<ApiResponse<Payload>> => {
     const authData = getAuthData() as AuthData;
 
-    // Convert Payload back to internal format if provided
+    // Преобразуем Payload обратно в внутренний формат (если предоставлен)
     const internalEntityData = entityData ? fromPayload(entityData) : {};
 
     const result = await DataProcessingService.updateEntityRecord(

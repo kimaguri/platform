@@ -572,10 +572,25 @@ export async function getAppBootstrapData(
         }),
       ]);
 
+    // Детальная диагностика результатов
+    console.log('[Bootstrap] userResult status:', userResult.status);
+    if (userResult.status === 'fulfilled') {
+      console.log('[Bootstrap] userResult.value:', userResult.value);
+      console.log('[Bootstrap] userResult.value length:', userResult.value?.length);
+    } else {
+      console.log('[Bootstrap] userResult error:', userResult.reason);
+    }
+
     const userData = userResult.status === 'fulfilled' ? userResult.value[0] : null;
     const dictionaries = dictionariesResult.status === 'fulfilled' ? dictionariesResult.value : [];
     const resources = resourcesResult.status === 'fulfilled' ? resourcesResult.value : [];
     const permissions = permissionsResult.status === 'fulfilled' ? permissionsResult.value : [];
+
+    console.log('[Bootstrap] Final userData:', userData);
+    console.log('[Bootstrap] tenantId:', tenantId, 'userId:', userId);
+    console.log('[Bootstrap] dictionaries count:', dictionaries.length);
+    console.log('[Bootstrap] resources count:', resources.length);
+    console.log('[Bootstrap] permissions count:', permissions.length);
 
     if (userData) {
       console.log('[Bootstrap] User position_role data:', userData.position?.position_role);

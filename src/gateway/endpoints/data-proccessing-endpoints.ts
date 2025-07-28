@@ -19,15 +19,23 @@ interface ContentItem {
   publishedAt?: string;
 }
 
+// Типы для унифицированной структуры данных (совпадают с data-processing)
+type ExtensionFieldValue = Record<string, any>;
+
+type Payload = {
+  baseFields: Record<string, any>;
+  extensions: ExtensionFieldValue;
+};
+
 interface CreateEntityRequest {
   entity: string;
-  data: Record<string, any>;
+  entityData: Payload; // Изменено с data на entityData типа Payload
 }
 
 interface UpdateEntityRequest {
   id: string;
   entity: string;
-  data: Record<string, any>;
+  entityData: Payload; // Изменено с data на entityData типа Payload
 }
 
 /**
@@ -48,7 +56,7 @@ export const createEntityRecord = api(
       // Proxy to data-processing service
       const result = await dataProcessingClient.createEntityRecord({
         entity: data.entity,
-        data: data.data,
+        data: data.entityData, // Используем entityData вместо data
       });
 
       return {
@@ -89,11 +97,7 @@ export const getEntityRecordById = api(
 
 export const updateEntityRecord = api(
   { method: 'PUT', path: '/api/v1/entity/:entity/:id', expose: true, auth: true },
-  async ({
-    entity,
-    id,
-    ...data
-  }: UpdateEntityRequest & { id: string }): Promise<ApiResponse<ContentItem>> => {
+  async (data: UpdateEntityRequest & { id: string }): Promise<ApiResponse<ContentItem>> => {
     const authData = getAuthData() as AuthData;
 
     // // Check if user has content write permissions
@@ -104,9 +108,9 @@ export const updateEntityRecord = api(
     try {
       // Proxy to data-processing service
       const result = await dataProcessingClient.updateEntityRecord({
-        entity,
-        id,
-        ...data,
+        entity: data.entity,
+        id: data.id,
+        data: data.entityData, // Используем entityData вместо data
       });
 
       return {

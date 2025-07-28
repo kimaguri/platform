@@ -6,6 +6,34 @@
  * using Encore.ts generated clients
  */
 
+// Типы для преобразования данных (совпадают с data-processing/api.ts)
+type ExtensionFieldValue = Record<string, any>;
+
+type Payload = {
+  baseFields: Record<string, any>;
+  extensions: ExtensionFieldValue;
+};
+
+/**
+ * Преобразование простых данных в Payload для data-processing сервиса
+ */
+function toPayload(data: Record<string, any>): Payload {
+  return {
+    baseFields: data,
+    extensions: {},
+  };
+}
+
+/**
+ * Преобразование Payload обратно в простые данные
+ */
+function fromPayload(payload: Payload): Record<string, any> {
+  return {
+    ...payload.baseFields,
+    ...payload.extensions,
+  };
+}
+
 // Import generated RPC clients for internal microservices
 // Note: These will be available after encore generates the clients
 // For now using dynamic imports to avoid build errors
@@ -275,20 +303,35 @@ export const dataProcessingClient = {
 
   /**
    * Create new entity
+   * Принимает { entity, data: Payload } и передает в data-processing
    */
-  createEntityRecord: async (params: { entity: string; data: Record<string, any> }) => {
+  createEntityRecord: async (params: { entity: string; data: Payload }) => {
     if (dataProcessingService?.createEntityRecord) {
-      return await dataProcessingService.createEntityRecord(params);
+      // Передаем Payload напрямую в data-processing сервис
+      const transformedParams = {
+        entityTable: params.entity,
+        entityData: params.data, // Прямая передача Payload
+        extensionFieldsData: params.data.extensions, // Используем extensions из Payload
+      };
+      return await dataProcessingService.createEntityRecord(transformedParams);
     }
     throw new Error('Data processing service not available');
   },
 
   /**
    * Update existing entity
+   * Принимает { entity, id, data: Payload } и передает в data-processing
    */
-  updateEntityRecord: async (params: { entity: string; id: string; data: Record<string, any> }) => {
+  updateEntityRecord: async (params: { entity: string; id: string; data: Payload }) => {
     if (dataProcessingService?.updateEntityRecord) {
-      return await dataProcessingService.updateEntityRecord(params);
+      // Передаем Payload напрямую в data-processing сервис
+      const transformedParams = {
+        entityTable: params.entity,
+        recordId: params.id,
+        entityData: params.data, // Прямая передача Payload
+        extensionFieldsData: params.data.extensions, // Используем extensions из Payload
+      };
+      return await dataProcessingService.updateEntityRecord(transformedParams);
     }
     throw new Error('Data processing service not available');
   },
