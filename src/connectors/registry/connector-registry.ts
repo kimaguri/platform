@@ -78,7 +78,7 @@ export function getAdminAdapter(table: string): Adapter {
     return registryState.cache.get(cacheKey)!;
   }
 
-  // Use the same hardcoded admin DB config as current adminAdapter
+  // Use hardcoded admin DB config (will be replaced by service-level secrets)
   const adminConfig = {
     type: 'supabase' as const,
     supabaseUrl: 'https://zshakbdzhwxfxzyqtizl.supabase.co',

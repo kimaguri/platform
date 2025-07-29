@@ -1,3 +1,4 @@
+import { secret } from 'encore.dev/config';
 import type { ApiResponse } from '../../lib/types';
 import type {
   Tenant,
@@ -7,6 +8,10 @@ import type {
   CreateSupabaseConfigRequest,
   TenantConfig,
 } from './src/models/tenant';
+
+// Encore secrets for admin database
+const adminSupabaseUrl = secret('AdminSupabaseUrl');
+const adminSupabaseServiceKey = secret('AdminSupabaseServiceKey');
 
 // Import admin operations - functional approach following other services
 import {
@@ -704,4 +709,21 @@ export async function getAvailableTables(tenantId: string): Promise<ApiResponse<
       }`,
     };
   }
+}
+
+// ===== SECRET HELPER FUNCTIONS =====
+// These functions provide access to Encore secrets from within the service
+
+/**
+ * Get admin Supabase URL from Encore secrets
+ */
+export function getAdminSupabaseUrl(): string {
+  return adminSupabaseUrl();
+}
+
+/**
+ * Get admin Supabase service key from Encore secrets
+ */
+export function getAdminSupabaseServiceKey(): string {
+  return adminSupabaseServiceKey();
 }

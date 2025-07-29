@@ -8,11 +8,9 @@ import {
   CreateSupabaseConfigRequest,
   UpdateTenantRequest,
 } from './types';
-
 import { getAdminSupabaseUrl, getAdminSupabaseServiceKey } from '../utils/helpers/secrets';
 
-// Modern configuration using Encore TS secrets
-// Fallback to environment variables for backwards compatibility
+// Admin database configuration using helper functions (fallback to environment variables)
 
 // Клиент для административной базы данных
 let adminClient: SupabaseClient | null = null;
@@ -22,11 +20,15 @@ let adminClient: SupabaseClient | null = null;
  */
 function getAdminClient(): SupabaseClient {
   if (!adminClient) {
-    // Use the same hardcoded credentials as adminAdapter.ts for consistency
-    const adminUrl = 'https://zshakbdzhwxfxzyqtizl.supabase.co';
-    const adminServiceKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpzaGFrYmR6aHd4Znh6eXF0aXpsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MzExMzk0OSwiZXhwIjoyMDY4Njg5OTQ5fQ.c67jAz_5TLnq7GY9hega04v1M7Jv0OiTrVfBlPBiEPI';
+    // Get admin database credentials from helper functions
+    const adminUrl = getAdminSupabaseUrl();
+    const adminServiceKey = getAdminSupabaseServiceKey();
 
-    adminClient = createClient(adminUrl, adminServiceKey);
+    // Fallback to hardcoded values if environment variables are not set
+    const finalAdminUrl = adminUrl || 'https://zshakbdzhwxfxzyqtizl.supabase.co';
+    const finalAdminServiceKey = adminServiceKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpzaGFrYmR6aHd4Znh6eXF0aXpsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MzExMzk0OSwiZXhwIjoyMDY4Njg5OTQ5fQ.c67jAz_5TLnq7GY9hega04v1M7Jv0OiTrVfBlPBiEPI';
+
+    adminClient = createClient(finalAdminUrl, finalAdminServiceKey);
   }
 
   return adminClient;

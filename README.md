@@ -171,7 +171,7 @@ NODE_ENV=development
 PORT=4000
 LOG_LEVEL=debug
 
-# Database
+# Database (Legacy - используйте Encore secrets для production)
 ADMIN_SUPABASE_URL=https://your-project.supabase.co
 ADMIN_SUPABASE_SERVICE_KEY=your-service-key
 TENANT_CONFIG={"tenant1": {"SUPABASE_URL": "...", "ANON_KEY": "..."}}
@@ -185,6 +185,26 @@ ENABLE_RATE_LIMITING=true
 REQUEST_TIMEOUT=30000
 RATE_LIMIT_REQUESTS=100
 ```
+
+### 🔐 Система секретов Encore.ts
+
+Для безопасного управления секретами используется встроенная система Encore:
+
+**Локальная разработка:**
+```bash
+# Создайте файл .secrets.local.cue
+AdminSupabaseUrl: "https://your-admin-project.supabase.co"
+AdminSupabaseServiceKey: "your-service-key"
+```
+
+**Production:**
+```bash
+# Установите секреты через CLI
+encore secret set --type prod AdminSupabaseUrl
+encore secret set --type prod AdminSupabaseServiceKey
+```
+
+📖 Подробное руководство: [`docs/secrets-setup-guide.md`](docs/secrets-setup-guide.md)
 
 See `env.example` for complete configuration options.
 

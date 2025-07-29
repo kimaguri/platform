@@ -1,9 +1,6 @@
 import { getActiveTenants, checkAdminConnection } from '../../../lib/adminDb/client';
 import { createClient } from '@supabase/supabase-js';
-import {
-  getAdminSupabaseUrl,
-  getAdminSupabaseServiceKey,
-} from '../../../lib/utils/helpers/secrets';
+import { getAdminSupabaseUrl, getAdminSupabaseServiceKey } from '../service';
 
 /**
  * Extensible Fields Management в Tenant Management Service
@@ -49,8 +46,9 @@ const ADMIN_CACHE_TTL = 10 * 60 * 1000; // 10 минут для админски
 function getAdminClient() {
   console.log('[ExtensibleFields] getAdminClient called');
   
-  const adminUrl = 'https://zshakbdzhwxfxzyqtizl.supabase.co';
-  const adminServiceKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpzaGFrYmR6aHd4Znh6eXF0aXpsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MzExMzk0OSwiZXhwIjoyMDY4Njg5OTQ5fQ.c67jAz_5TLnq7GY9hega04v1M7Jv0OiTrVfBlPBiEPI';
+  // Get admin database credentials from service secrets
+  const adminUrl = getAdminSupabaseUrl();
+  const adminServiceKey = getAdminSupabaseServiceKey();
 
   console.log('[ExtensibleFields] Config values:', { 
     adminUrl, 

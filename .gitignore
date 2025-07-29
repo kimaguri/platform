@@ -5,4 +5,8 @@ encore.gen.cue
 node_modules
 /encore.gen
 
+# Encore secrets - NEVER commit these files
+.secrets.*.cue
+*.secrets.cue
+
 dist
