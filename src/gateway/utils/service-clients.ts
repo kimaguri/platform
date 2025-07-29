@@ -147,6 +147,19 @@ export const userManagementClient = {
     }
     throw new Error('User management service not available');
   },
+
+  /**
+   * Authentication - Refresh token
+   */
+  refreshToken: async (params: {
+    tenantId: string;
+    refreshToken: string;
+  }) => {
+    if (userManagementService?.refreshToken) {
+      return await userManagementService.refreshToken(params);
+    }
+    throw new Error('User management service not available');
+  },
   getUser: async (params: any) => {
     console.log('params', params);
     return await userManagementService.getUserProfileById({
@@ -250,8 +263,106 @@ export const tenantManagementClient = {
    * Health check for tenant management system
    */
   healthCheck: async () => {
-    if (tenantManagementService?.healthCheck) {
-      return await tenantManagementService.healthCheck();
+    if (tenantManagementService?.health) {
+      return await tenantManagementService.health();
+    }
+    throw new Error('Tenant management service not available');
+  },
+
+  // ===== EXTENSION TABLE DEFINITIONS METHODS =====
+
+  /**
+   * Get field definitions for tenant and entity
+   */
+  getFieldDefinitions: async (params: { entityTable?: string }): Promise<any> => {
+    console.log('[ServiceClient] getFieldDefinitions called with params:', params);
+    if (tenantManagementService?.getFieldDefinitions) {
+      console.log('[ServiceClient] Calling tenantManagementService.getFieldDefinitions with:', params);
+      const result = await tenantManagementService.getFieldDefinitions(params);
+      console.log('[ServiceClient] tenantManagementService.getFieldDefinitions result:', result);
+      // Возвращаем весь ApiResponse, а не только data
+      return result;
+    }
+    throw new Error('Tenant management service not available');
+  },
+
+  /**
+   * Get all field definitions for tenant
+   */
+  getAllFieldDefinitions: async (): Promise<Record<string, any[]>> => {
+    if (tenantManagementService?.getAllFieldDefinitions) {
+      return await tenantManagementService.getAllFieldDefinitions();
+    }
+    throw new Error('Tenant management service not available');
+  },
+
+  /**
+   * Create new field definition
+   */
+  createFieldDefinition: async (
+    tenantId: string,
+    fieldDefinition: any
+  ): Promise<any> => {
+    if (tenantManagementService?.createFieldDefinition) {
+      return await tenantManagementService.createFieldDefinition({ tenantId, fieldDefinition });
+    }
+    throw new Error('Tenant management service not available');
+  },
+
+  /**
+   * Update existing field definition
+   */
+  updateFieldDefinition: async (params: {
+    fieldId: number;
+    updates: any;
+  }): Promise<any> => {
+    if (tenantManagementService?.updateFieldDefinition) {
+      return await tenantManagementService.updateFieldDefinition(params);
+    }
+    throw new Error('Tenant management service not available');
+  },
+
+  /**
+   * Delete field definition
+   */
+  deleteFieldDefinition: async (params: { fieldId: number }): Promise<boolean> => {
+    if (tenantManagementService?.deleteFieldDefinition) {
+      return await tenantManagementService.deleteFieldDefinition(params);
+    }
+    throw new Error('Tenant management service not available');
+  },
+
+  /**
+   * Get extensible fields statistics
+   */
+  getExtensibleFieldsStats: async (): Promise<{
+    totalTenants: number;
+    totalFields: number;
+    fieldsByTenant: Record<string, number>;
+    fieldsByEntity: Record<string, number>;
+  }> => {
+    if (tenantManagementService?.getExtensibleFieldsStats) {
+      return await tenantManagementService.getExtensibleFieldsStats();
+    }
+    throw new Error('Tenant management service not available');
+  },
+
+  /**
+   * Get list of supported entities for extensible fields
+   */
+  getSupportedEntities: async (): Promise<string[]> => {
+    if (tenantManagementService?.getSupportedEntities) {
+      return await tenantManagementService.getSupportedEntities();
+    }
+    throw new Error('Tenant management service not available');
+  },
+
+  /**
+   * Get available tables for tenant in public schema
+   */
+  getAvailableTables: async (): Promise<any> => {
+    if (tenantManagementService?.getAvailableTables) {
+      return await tenantManagementService.getAvailableTables();
     }
     throw new Error('Tenant management service not available');
   },

@@ -17,7 +17,7 @@ export interface ExtensionFieldDefinition {
   tenant_id: string;
   entity_table: string;
   field_name: string;
-  field_type: 'text' | 'number' | 'boolean' | 'date' | 'json' | 'select';
+  field_type: 'text' | 'number' | 'boolean' | 'date' | 'json' | 'select' | 'multiselect';
   display_name: string;
   description?: string;
   is_required: boolean;
@@ -47,14 +47,33 @@ const ADMIN_CACHE_TTL = 10 * 60 * 1000; // 10 минут для админски
  * Получение клиента админской БД
  */
 function getAdminClient() {
-  const adminUrl = getAdminSupabaseUrl();
-  const adminServiceKey = getAdminSupabaseServiceKey();
+  console.log('[ExtensibleFields] getAdminClient called');
+  
+  const adminUrl = 'https://zshakbdzhwxfxzyqtizl.supabase.co';
+  const adminServiceKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpzaGFrYmR6aHd4Znh6eXF0aXpsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MzExMzk0OSwiZXhwIjoyMDY4Njg5OTQ5fQ.c67jAz_5TLnq7GY9hega04v1M7Jv0OiTrVfBlPBiEPI';
+
+  console.log('[ExtensibleFields] Config values:', { 
+    adminUrl, 
+    hasServiceKey: !!adminServiceKey,
+    serviceKeyLength: adminServiceKey?.length 
+  });
 
   if (!adminUrl || !adminServiceKey) {
+    console.error('[ExtensibleFields] Missing admin config:', { adminUrl: !!adminUrl, adminServiceKey: !!adminServiceKey });
     throw new Error('Admin Supabase configuration not found');
   }
 
-  return createClient(adminUrl, adminServiceKey);
+  console.log('[ExtensibleFields] Creating Supabase client...');
+  console.log('[ExtensibleFields] createClient function:', typeof createClient);
+  
+  const client = createClient(adminUrl, adminServiceKey);
+  console.log('[ExtensibleFields] Created client:', { client: !!client, clientType: typeof client });
+  
+  if (!client) {
+    throw new Error('Failed to create Supabase client');
+  }
+  
+  return client;
 }
 
 /**
@@ -84,30 +103,49 @@ export async function getFieldDefinitionsForTenant(
   tenantId: string,
   entityTable: string
 ): Promise<ExtensionFieldDefinition[]> {
+  console.log('[ExtensibleFields] getFieldDefinitionsForTenant called:', { tenantId, entityTable });
+  
   const cacheKey = `${tenantId}:${entityTable}`;
 
   // Проверяем кеш
   const cached = adminFieldDefinitionsCache.get(cacheKey);
   if (cached && Date.now() - cached.timestamp <= ADMIN_CACHE_TTL) {
+    console.log('[ExtensibleFields] Returning cached data:', cached.data.length, 'items');
     return cached.data;
   }
 
+  console.log('[ExtensibleFields] Cache miss, fetching from admin DB...');
+  
   // Получаем админский клиент
   const adminClient = getAdminClient();
+  console.log('[ExtensibleFields] Got admin client, executing query...');
 
-  // Загружаем определения полей из админской БД
-  const { data, error } = await adminClient
-    .from('extension_table_definitions')
-    .select('*')
-    .eq('tenant_id', tenantId)
-    .eq('entity_table', entityTable)
-    .eq('is_active', true)
-    .order('display_name');
-
-  if (error) {
-    throw new Error(
-      `Failed to load field definitions from admin DB for ${tenantId}:${entityTable}: ${error.message}`
-    );
+  let data, error;
+  
+  try {
+    // Загружаем определения полей из админской БД
+    const result = await adminClient
+      .from('extension_field_definitions')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .eq('entity_table', entityTable)
+      .eq('is_active', true)
+      .order('display_name');
+      
+    data = result.data;
+    error = result.error;
+      
+    console.log('[ExtensibleFields] Query executed:', { data: !!data, error: !!error, dataLength: data?.length });
+    
+    if (error) {
+      console.error('[ExtensibleFields] Query error:', error);
+      throw new Error(
+        `Failed to load field definitions from admin DB for ${tenantId}:${entityTable}: ${error.message}`
+      );
+    }
+  } catch (queryError) {
+    console.error('[ExtensibleFields] Query execution failed:', queryError);
+    throw queryError;
   }
 
   const definitions = data || [];
@@ -130,7 +168,7 @@ export async function getAllFieldDefinitionsForTenant(
   const adminClient = getAdminClient();
 
   const { data, error } = await adminClient
-    .from('extension_table_definitions')
+    .from('extension_field_definitions')
     .select('*')
     .eq('tenant_id', tenantId)
     .eq('is_active', true)
@@ -183,20 +221,44 @@ export async function createFieldDefinition(
 
   const adminClient = getAdminClient();
 
+  const insertData = {
+    ...fieldDefinition,
+    tenant_id: tenantId,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
+  console.log('[ExtensibleFields] Inserting data:', insertData);
+
+  // First, let's check if the table exists by trying to select from it
+  console.log('[ExtensibleFields] Testing table existence...');
+  const { data: testData, error: testError } = await adminClient
+    .from('extension_field_definitions')
+    .select('count')
+    .limit(1);
+  
+  console.log('[ExtensibleFields] Table test result:', { testData, testError });
+
   const { data, error } = await adminClient
-    .from('extension_table_definitions')
-    .insert({
-      ...fieldDefinition,
-      tenant_id: tenantId,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    })
+    .from('extension_field_definitions')
+    .insert(insertData)
     .select()
     .single();
 
+  console.log('[ExtensibleFields] Supabase response:', { data, error });
+
   if (error) {
-    throw new Error(`Failed to create field definition: ${error.message}`);
+    console.error('[ExtensibleFields] Supabase error:', error);
+    const errorMessage = error.message || error.details || JSON.stringify(error) || 'Unknown Supabase error';
+    throw new Error(`Failed to create field definition: ${errorMessage}`);
   }
+
+  if (!data) {
+    console.error('[ExtensibleFields] No data returned from Supabase');
+    throw new Error('Failed to create field definition: No data returned from database');
+  }
+
+  console.log('[ExtensibleFields] Successfully created field:', data);
 
   // Инвалидируем кеш для этой сущности
   invalidateCache(tenantId, fieldDefinition.entity_table);
@@ -214,7 +276,7 @@ export async function updateFieldDefinition(
   const adminClient = getAdminClient();
 
   const { data, error } = await adminClient
-    .from('extension_table_definitions')
+    .from('extension_field_definitions')
     .update({
       ...updates,
       updated_at: new Date().toISOString(),
@@ -240,7 +302,7 @@ export async function deleteFieldDefinition(fieldId: number): Promise<void> {
   const adminClient = getAdminClient();
 
   const { data, error } = await adminClient
-    .from('extension_table_definitions')
+    .from('extension_field_definitions')
     .update({
       is_active: false,
       updated_at: new Date().toISOString(),
@@ -266,7 +328,7 @@ export async function getTenantsWithExtensibleFields(): Promise<string[]> {
   const adminClient = getAdminClient();
 
   const { data, error } = await adminClient
-    .from('extension_table_definitions')
+    .from('extension_field_definitions')
     .select('tenant_id')
     .eq('is_active', true);
 
@@ -291,7 +353,7 @@ export async function getExtensibleFieldsStats(): Promise<{
   const adminClient = getAdminClient();
 
   const { data, error } = await adminClient
-    .from('extension_table_definitions')
+    .from('extension_field_definitions')
     .select('tenant_id, entity_table')
     .eq('is_active', true);
 
@@ -398,7 +460,7 @@ export function getCacheStats(): { size: number; entries: string[] } {
 export async function checkExtensibleFieldsConnection(): Promise<boolean> {
   try {
     const adminClient = getAdminClient();
-    const { error } = await adminClient.from('extension_table_definitions').select('id').limit(1);
+    const { error } = await adminClient.from('extension_field_definitions').select('id').limit(1);
     return !error;
   } catch {
     return false;

@@ -10,7 +10,6 @@ import type {
   CreateSupabaseConfigRequest,
   TenantConfig,
 } from './src/models/tenant';
-import type { ExtensionFieldDefinition } from './src/extensible-fields';
 import * as TenantService from './service';
 
 /**
@@ -113,16 +112,19 @@ export const createSupabaseConfig = api(
  * Используется Content Management Service для получения метаданных
  */
 export const getFieldDefinitions = api(
-  { auth: true, method: 'GET', path: '/tenants/:tenantId/fields/:entityTable' },
+  { auth: true, method: 'GET', path: '/extensions' },
   async ({
-    tenantId,
     entityTable,
   }: {
-    tenantId: string;
-    entityTable: string;
-  }): Promise<ApiResponse<ExtensionFieldDefinition[]>> => {
+    entityTable?: Query<string>;
+  }): Promise<ApiResponse<any[]>> => {
     const authData = getAuthData() as AuthData;
-    return TenantService.getFieldDefinitionsForTenant(tenantId, entityTable);
+    console.log('[TenantManagement API] getFieldDefinitions called with:', { entityTable });
+    console.log('[TenantManagement API] authData:', { tenantId: authData.tenantId, userRole: authData.userRole });
+    console.log('[TenantManagement API] Calling TenantService.getFieldDefinitionsForTenant with:', { tenantId: authData.tenantId, entityTable: entityTable || undefined });
+    const result = await TenantService.getFieldDefinitionsForTenant(authData.tenantId, entityTable || undefined);
+    console.log('[TenantManagement API] TenantService.getFieldDefinitionsForTenant result:', result);
+    return result;
   }
 );
 
@@ -130,14 +132,10 @@ export const getFieldDefinitions = api(
  * Получение всех определений полей для тенанта
  */
 export const getAllFieldDefinitions = api(
-  { auth: true, method: 'GET', path: '/tenants/:tenantId/fields' },
-  async ({
-    tenantId,
-  }: {
-    tenantId: string;
-  }): Promise<ApiResponse<Record<string, ExtensionFieldDefinition[]>>> => {
+  { auth: true, method: 'GET', path: '/extensions/all' },
+  async (): Promise<ApiResponse<Record<string, any[]>>> => {
     const authData = getAuthData() as AuthData;
-    return TenantService.getAllFieldDefinitionsForTenant(tenantId);
+    return TenantService.getAllFieldDefinitionsForTenant(authData.tenantId);
   }
 );
 
@@ -145,18 +143,29 @@ export const getAllFieldDefinitions = api(
  * Создание нового определения поля
  */
 export const createFieldDefinition = api(
-  { auth: true, method: 'POST', path: '/tenants/:tenantId/fields' },
+  { auth: true, method: 'POST', path: '/extensions' },
   async ({
     tenantId,
     fieldDefinition,
   }: {
     tenantId: string;
-    fieldDefinition: Omit<
-      ExtensionFieldDefinition,
-      'id' | 'tenant_id' | 'created_at' | 'updated_at'
-    >;
-  }): Promise<ApiResponse<ExtensionFieldDefinition>> => {
-    const authData = getAuthData() as AuthData;
+    fieldDefinition: {
+      entity_table: string;
+      field_name: string;
+      field_type: 'text' | 'number' | 'boolean' | 'date' | 'json' | 'select' | 'multiselect';
+      display_name: string;
+      description?: string;
+      is_required: boolean;
+      is_searchable: boolean;
+      is_filterable: boolean;
+      is_sortable: boolean;
+      is_active: boolean;
+      default_value?: any;
+      validation_rules?: Record<string, any>;
+      ui_config?: Record<string, any>;
+      field_options?: string[];
+    };
+  }): Promise<ApiResponse<any>> => {
     return TenantService.createFieldDefinition(tenantId, fieldDefinition);
   }
 );
@@ -165,18 +174,26 @@ export const createFieldDefinition = api(
  * Обновление определения поля
  */
 export const updateFieldDefinition = api(
-  { auth: true, method: 'PUT', path: '/tenants/fields/:fieldId' },
+  { auth: true, method: 'PUT', path: '/extensions/:fieldId' },
   async ({
     fieldId,
     updates,
   }: {
     fieldId: number;
-    updates: Partial<
-      Omit<ExtensionFieldDefinition, 'id' | 'tenant_id' | 'created_at' | 'updated_at'>
-    >;
-  }): Promise<ApiResponse<ExtensionFieldDefinition>> => {
+    updates: {
+      entity_table?: string;
+      field_name?: string;
+      field_type?: 'text' | 'number' | 'boolean' | 'date' | 'json' | 'select' | 'multiselect';
+      display_name?: string;
+      description?: string;
+      is_required?: boolean;
+      default_value?: any;
+      validation_rules?: Record<string, any>;
+      field_options?: string[];
+    };
+  }): Promise<ApiResponse<any>> => {
     const authData = getAuthData() as AuthData;
-    return TenantService.updateFieldDefinition(fieldId, updates);
+    return TenantService.updateFieldDefinition(authData.tenantId, fieldId, updates);
   }
 );
 
@@ -184,10 +201,10 @@ export const updateFieldDefinition = api(
  * Удаление определения поля
  */
 export const deleteFieldDefinition = api(
-  { auth: true, method: 'DELETE', path: '/tenants/fields/:fieldId' },
+  { auth: true, method: 'DELETE', path: '/extensions/:fieldId' },
   async ({ fieldId }: { fieldId: number }): Promise<ApiResponse<boolean>> => {
     const authData = getAuthData() as AuthData;
-    return TenantService.deleteFieldDefinition(fieldId);
+    return TenantService.deleteFieldDefinition(authData.tenantId, fieldId);
   }
 );
 
@@ -195,7 +212,7 @@ export const deleteFieldDefinition = api(
  * Получение статистики использования extensible fields
  */
 export const getExtensibleFieldsStats = api(
-  { auth: true, method: 'GET', path: '/tenants/extensible-fields/stats' },
+  { auth: true, method: 'GET', path: '/extensions/stats' },
   async (): Promise<
     ApiResponse<{
       totalTenants: number;
@@ -213,9 +230,20 @@ export const getExtensibleFieldsStats = api(
  * Получение списка поддерживаемых сущностей
  */
 export const getSupportedEntities = api(
-  { auth: true, method: 'GET', path: '/tenants/extensible-fields/supported-entities' },
+  { auth: true, method: 'GET', path: '/extensions/supported-entities' },
   async (): Promise<ApiResponse<string[]>> => {
     return TenantService.getSupportedEntities();
+  }
+);
+
+/**
+ * Get available tables for tenant in public schema
+ */
+export const getAvailableTables = api(
+  { auth: true, method: 'GET', path: '/available-tables' },
+  async (): Promise<ApiResponse<string[]>> => {
+    const authData = getAuthData() as AuthData;
+    return TenantService.getAvailableTables(authData.tenantId);
   }
 );
 

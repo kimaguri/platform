@@ -12,8 +12,13 @@ export interface ExtensionFieldDefinition {
   display_name: string;
   description?: string;
   is_required: boolean;
+  is_searchable: boolean;
+  is_filterable: boolean;
+  is_sortable: boolean;
+  is_active: boolean;
   default_value?: any;
   validation_rules?: Record<string, any>;
+  ui_config?: Record<string, any>;
   field_options?: string[]; // For select/multiselect types
   created_at: string;
   updated_at: string;

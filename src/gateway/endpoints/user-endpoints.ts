@@ -70,32 +70,6 @@ interface AppBootstrapData {
 }
 
 // Request/Response interfaces
-interface LoginRequest {
-  email: string;
-  password: string;
-}
-
-interface RegisterRequest {
-  email: string;
-  password: string;
-  firstName?: string;
-  lastName?: string;
-  displayName?: string;
-}
-
-interface AuthResponse {
-  token: string;
-  refreshToken?: string;
-  expiresAt: string;
-  user: {
-    id: string;
-    email: string;
-    firstName?: string;
-    lastName?: string;
-    displayName?: string;
-    role: string;
-  };
-}
 
 interface UserProfile {
   id: string;
@@ -121,106 +95,13 @@ interface UpdateUserRequest {
  * Authentication Endpoints - /api/v1/auth/*
  */
 
-export const login = api(
-  { method: 'POST', path: '/api/v1/auth/login', expose: true, auth: false },
-  async (
-    data: LoginRequest & { tenantId: Header<'X-Tenant-Id'> }
-  ): Promise<ApiResponse<AuthResponse>> => {
-    try {
-      // Use RPC call to user-management service through universal adapter
-      const result = await userManagementClient.login({
-        tenantId: data.tenantId,
-        email: data.email,
-        password: data.password,
-      });
 
-      // Check if the result contains an error
-      if ('error' in result && result.error) {
-        throw new Error(result.error);
-      }
 
-      // Return successful result
-      return {
-        data: result.data,
-        message: result.message || 'Login successful',
-      };
-    } catch (error) {
-      throw new Error(`Login failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  }
-);
 
-export const register = api(
-  { method: 'POST', path: '/api/v1/auth/register', expose: true, auth: false },
-  async (
-    data: RegisterRequest & { tenantId: Header<'X-Tenant-ID'> }
-  ): Promise<ApiResponse<AuthResponse>> => {
-    try {
-      // Use RPC call to user-management service through universal adapter
-      const result = await userManagementClient.register({
-        tenantId: data.tenantId,
-        email: data.email,
-        password: data.password,
-        firstName: data.firstName,
-        lastName: data.lastName,
-        displayName: data.displayName,
-      });
 
-      // Check if the result contains an error
-      if ('error' in result && result.error) {
-        throw new Error(result.error);
-      }
 
-      // Return successful result
-      return {
-        data: result.data,
-        message: result.message || 'Registration successful',
-      };
-    } catch (error) {
-      throw new Error(
-        `Registration failed: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
-    }
-  }
-);
 
-export const logout = api(
-  { method: 'POST', path: '/api/v1/auth/logout', expose: true, auth: true },
-  async (): Promise<ApiResponse<{ success: boolean }>> => {
-    const authData = getAuthData() as AuthData;
 
-    try {
-      // In a real implementation, invalidate the token
-      // For now, just return success
-      return {
-        data: { success: true },
-        message: 'Logout successful',
-      };
-    } catch (error) {
-      throw new Error(`Logout failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  }
-);
-
-export const resetPassword = api(
-  { method: 'POST', path: '/api/v1/auth/reset-password', expose: true },
-  async (data: {
-    email: string;
-    tenantId: Header<'X-Tenant-ID'>;
-  }): Promise<ApiResponse<{ success: boolean }>> => {
-    try {
-      // Proxy to user-management service for password reset
-      return {
-        data: { success: true },
-        message: 'Password reset email sent',
-      };
-    } catch (error) {
-      throw new Error(
-        `Password reset failed: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
-    }
-  }
-);
 
 /**
  * User Management Endpoints - /api/v1/users/*

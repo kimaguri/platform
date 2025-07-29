@@ -19,9 +19,6 @@ import {
   getTenantConfigById as getAdminTenantConfigById,
   createTenantConfig as createAdminTenantConfig,
   updateTenantConfig as updateAdminTenantConfig,
-  getAllExtensionFields,
-  getExtensionFieldsByTenant,
-  getExtensionFieldsByTenantAndEntity,
   createExtensionField as createAdminExtensionField,
   updateExtensionField as updateAdminExtensionField,
   deleteExtensionField as deleteAdminExtensionField,
@@ -30,7 +27,12 @@ import {
 } from './src/admin-operations';
 
 import type { ExtensionFieldDefinition } from './src/models/extensionField';
-import { SUPPORTED_ENTITIES } from './src/extensible-fields';
+import {
+  SUPPORTED_ENTITIES,
+  getFieldDefinitionsForTenant as getExtensionFieldsForTenant,
+  getAllFieldDefinitionsForTenant as getAllExtensionFieldsForTenant,
+  createFieldDefinition as createExtensionFieldDefinition,
+} from './src/extensible-fields';
 import { getTenantFullInfo } from '../../lib/adminDb/client';
 
 /**
@@ -269,16 +271,37 @@ export async function getTenantConfiguration(tenantId: string): Promise<ApiRespo
  */
 export async function getFieldDefinitionsForTenant(
   tenantId: string,
-  entityTable: string
+  entityTable?: string
 ): Promise<ApiResponse<ExtensionFieldDefinition[]>> {
   try {
-    const definitions = await getExtensionFieldsByTenantAndEntity(tenantId, entityTable);
+    console.log('[TenantService] getFieldDefinitionsForTenant called:', { tenantId, entityTable });
+
+    // Если entityTable не указан, получаем все поля для тенанта
+    if (!entityTable) {
+      console.log('[TenantService] No entityTable provided, getting all fields for tenant');
+      const allDefinitions = await getAllExtensionFieldsForTenant(tenantId);
+      
+      // Преобразуем Record<string, ExtensionFieldDefinition[]> в плоский массив
+      const flatDefinitions: ExtensionFieldDefinition[] = [];
+      Object.values(allDefinitions).forEach(entityFields => {
+        flatDefinitions.push(...entityFields);
+      });
+      
+      return {
+        data: flatDefinitions,
+        message: `Retrieved ${flatDefinitions.length} field definitions for tenant ${tenantId} (all entities)`,
+      };
+    }
+
+    const definitions = await getExtensionFieldsForTenant(tenantId, entityTable);
+    console.log('[TenantService] Got definitions:', definitions.length, 'items');
 
     return {
       data: definitions,
       message: `Retrieved ${definitions.length} field definitions for ${tenantId}:${entityTable}`,
     };
   } catch (error) {
+    console.error('[TenantService] Error in getFieldDefinitionsForTenant:', error);
     return {
       error: error instanceof Error ? error.message : 'Failed to fetch field definitions',
       message: 'Failed to fetch field definitions',
@@ -293,16 +316,7 @@ export async function getAllFieldDefinitionsForTenant(
   tenantId: string
 ): Promise<ApiResponse<Record<string, ExtensionFieldDefinition[]>>> {
   try {
-    const allDefinitions = await getExtensionFieldsByTenant(tenantId);
-    
-    // Group by entity_table
-    const definitions: Record<string, ExtensionFieldDefinition[]> = {};
-    for (const def of allDefinitions) {
-      if (!definitions[def.entity_table]) {
-        definitions[def.entity_table] = [];
-      }
-      definitions[def.entity_table]!.push(def);
-    }
+    const definitions = await getAllExtensionFieldsForTenant(tenantId);
 
     const totalFields = Object.values(definitions).reduce((sum, fields) => sum + fields.length, 0);
 
@@ -327,10 +341,28 @@ export async function createFieldDefinition(
   tenantId: string,
   fieldDefinition: Omit<ExtensionFieldDefinition, 'id' | 'tenant_id' | 'created_at' | 'updated_at'>
 ): Promise<ApiResponse<ExtensionFieldDefinition>> {
+  console.log('[TenantService] createFieldDefinition called with:', {
+    tenantId,
+    fieldDefinition: {
+      entity_table: fieldDefinition.entity_table,
+      field_name: fieldDefinition.field_name,
+      field_type: fieldDefinition.field_type,
+      display_name: fieldDefinition.display_name,
+      is_required: fieldDefinition.is_required,
+      is_active: fieldDefinition.is_active
+    }
+  });
+
   try {
-    const definition = await createAdminExtensionField({
-      ...fieldDefinition,
-      tenant_id: tenantId,
+    const now = new Date().toISOString();
+    console.log('[TenantService] Calling createAdminExtensionField...');
+    
+    const definition = await createExtensionFieldDefinition(tenantId, fieldDefinition);
+
+    console.log('[TenantService] createAdminExtensionField success:', {
+      id: definition.id,
+      field_name: definition.field_name,
+      display_name: definition.display_name
     });
 
     return {
@@ -338,6 +370,13 @@ export async function createFieldDefinition(
       message: `Created field definition '${definition.display_name}' for ${tenantId}:${definition.entity_table}`,
     };
   } catch (error) {
+    console.error('[TenantService] createFieldDefinition error:', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      tenantId,
+      fieldDefinition
+    });
+    
     return {
       error: error instanceof Error ? error.message : 'Failed to create field definition',
       message: 'Failed to create field definition',
@@ -349,10 +388,20 @@ export async function createFieldDefinition(
  * Update field definition
  */
 export async function updateFieldDefinition(
+  tenantId: string,
   fieldId: number,
   updates: Partial<Omit<ExtensionFieldDefinition, 'id' | 'tenant_id' | 'created_at' | 'updated_at'>>
 ): Promise<ApiResponse<ExtensionFieldDefinition>> {
   try {
+    // First, get the existing field to verify tenant ownership
+    const existingFieldsRecord = await getAllExtensionFieldsForTenant(tenantId);
+    const allFields = Object.values(existingFieldsRecord).flat();
+    const existingField = allFields.find((field: ExtensionFieldDefinition) => field.id === fieldId);
+
+    if (!existingField) {
+      throw new Error('Field definition not found or access denied');
+    }
+
     const definition = await updateAdminExtensionField(fieldId, updates);
     if (!definition) {
       throw new Error('Field definition not found');
@@ -360,7 +409,7 @@ export async function updateFieldDefinition(
 
     return {
       data: definition,
-      message: `Updated field definition '${definition.display_name}'`,
+      message: `Updated field definition '${definition.display_name}' for ${tenantId}`,
     };
   } catch (error) {
     return {
@@ -373,8 +422,20 @@ export async function updateFieldDefinition(
 /**
  * Delete field definition
  */
-export async function deleteFieldDefinition(fieldId: number): Promise<ApiResponse<boolean>> {
+export async function deleteFieldDefinition(
+  tenantId: string,
+  fieldId: number
+): Promise<ApiResponse<boolean>> {
   try {
+    // First, get the existing field to verify tenant ownership
+    const existingFieldsRecord = await getAllExtensionFieldsForTenant(tenantId);
+    const allFields = Object.values(existingFieldsRecord).flat();
+    const existingField = allFields.find((field: ExtensionFieldDefinition) => field.id === fieldId);
+
+    if (!existingField) {
+      throw new Error('Field definition not found or access denied');
+    }
+
     const success = await deleteAdminExtensionField(fieldId);
     if (!success) {
       throw new Error('Field definition not found');
@@ -382,7 +443,7 @@ export async function deleteFieldDefinition(fieldId: number): Promise<ApiRespons
 
     return {
       data: true,
-      message: `Deleted field definition ${fieldId}`,
+      message: `Deleted field definition ${fieldId} for ${tenantId}`,
     };
   } catch (error) {
     return {
@@ -407,18 +468,18 @@ export async function getExtensibleFieldsStats(): Promise<
     // Get all tenants and extension fields using admin operations
     const tenants = await getAllTenants();
     const allFields = await getAllExtensionFields();
-    
+
     // Calculate stats
     const fieldsByTenant: Record<string, number> = {};
     const fieldsByEntity: Record<string, number> = {};
-    
+
     for (const field of allFields) {
       // Count by tenant
       fieldsByTenant[field.tenant_id] = (fieldsByTenant[field.tenant_id] || 0) + 1;
       // Count by entity
       fieldsByEntity[field.entity_table] = (fieldsByEntity[field.entity_table] || 0) + 1;
     }
-    
+
     const stats = {
       totalTenants: tenants.length,
       totalFields: allFields.length,
@@ -536,6 +597,111 @@ export async function searchTenants(
     return {
       error: error instanceof Error ? error.message : 'Failed to search tenants',
       message: 'Failed to search tenants',
+    };
+  }
+}
+
+/**
+ * Get available tables for tenant in public schema using Supabase REST API with secret key
+ */
+export async function getAvailableTables(tenantId: string): Promise<ApiResponse<string[]>> {
+  try {
+    const { getTenantConfigById } = await import('../../lib/config/tenantConfig');
+    const tenantConfig = await getTenantConfigById(tenantId);
+
+    if (!tenantConfig) {
+      throw new Error(`Tenant configuration not found for tenant: ${tenantId}`);
+    }
+
+    // Создаём Supabase клиент с secret key (sb_secret_... или service_role JWT)
+    // Secret key обходит RLS и предоставляет полный доступ к базе данных
+    const { createClient } = await import('@supabase/supabase-js');
+    const supabaseClient = createClient(
+      tenantConfig.SUPABASE_URL,
+      tenantConfig.SERVICE_KEY || 'sb_publishable_G5EQN05zyYiPceHplDhoHg_QeH6kdIW' // Используем secret key для обхода RLS
+    );
+
+    // Используем прямой HTTP запрос к Supabase REST API для получения метаданных
+    // Secret key в заголовке Authorization позволяет обойти RLS
+    let tablesData: string[] = [];
+    let tablesError: any = null;
+    
+    try {
+      const response = await fetch(`${tenantConfig.SUPABASE_URL}/rest/v1/`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${tenantConfig.SERVICE_KEY}`,
+          'apikey': tenantConfig.SERVICE_KEY,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const openApiSpec = await response.json() as any;
+        // Извлекаем имена таблиц из OpenAPI спецификации
+        if (openApiSpec && openApiSpec.paths && typeof openApiSpec.paths === 'object') {
+          tablesData = Object.keys(openApiSpec.paths)
+            .filter(path => path.startsWith('/') && !path.includes('{') && !path.includes('rpc'))
+            .map(path => path.substring(1)) // убираем первый слэш
+            .filter(name => name && !name.includes('/') && name !== 'rpc') // только простые имена таблиц
+            .sort();
+          
+
+        }
+      } else {
+        tablesError = new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+    } catch (error) {
+      tablesError = error;
+    }
+
+    if (tablesError) {
+      // Используем статический список как fallback
+
+      const knownTables = [
+        'users',
+        'roles',
+        'permissions',
+        'dictionary',
+        'dictionary_value',
+        'employee',
+        'position',
+        'organization',
+        'work_calendar',
+        'work_months',
+        'lead_step',
+        'resource',
+        'role_resource_permissions',
+        'p_categories',
+        'p_sub_categories',
+        'p_nomenclatures',
+        'p_measurement_units',
+      ];
+
+      return {
+        data: knownTables,
+        message: 'Available tables retrieved successfully (static list)',
+      };
+    }
+
+    // Извлекаем имена таблиц из результата
+    // tablesData уже содержит массив строк с именами таблиц
+    const tableNames = Array.isArray(tablesData) ? tablesData : [];
+
+
+
+    return {
+      data: tableNames,
+      message: `Available tables retrieved successfully (${tableNames.length} tables found)`,
+    };
+  } catch (error) {
+    console.error('[getAvailableTables] Error:', error);
+
+    return {
+      data: [],
+      message: `Available tables not retrieved. Error: ${
+        error instanceof Error ? error.message : 'Unknown error'
+      }`,
     };
   }
 }
