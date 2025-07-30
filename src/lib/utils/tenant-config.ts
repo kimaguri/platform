@@ -1,9 +1,9 @@
 import { TenantsConfig, TenantConfig } from '../types';
 import {
-  getAllTenantConfigsLegacy,
-  getTenantConfigFromDB,
+  getAllTenantConfigs,
+  getTenantConfigById as getAdminTenantConfigById,
   checkAdminConnection,
-} from '../adminDb/client';
+} from '../../services/tenant-management/src/admin-operations';
 
 // Кэш для конфигураций тенантов
 let configCache: TenantsConfig | null = null;
@@ -27,9 +27,19 @@ export async function getTenantConfig(): Promise<TenantsConfig> {
 
     if (isDbConnected) {
       console.log('Loading tenant configs from database...');
-      const dbConfigs = await getAllTenantConfigsLegacy();
+      const dbConfigsArray = await getAllTenantConfigs();
 
-      if (Object.keys(dbConfigs).length > 0) {
+      if (dbConfigsArray.length > 0) {
+        // Преобразуем массив в объект TenantsConfig
+        const dbConfigs: TenantsConfig = {};
+        dbConfigsArray.forEach(config => {
+          dbConfigs[config.tenant_id] = {
+            SUPABASE_URL: config.supabase_url,
+            ANON_KEY: config.supabase_anon_key,
+            SERVICE_KEY: config.supabase_service_key,
+          };
+        });
+
         // Обновляем кэш
         configCache = dbConfigs;
         cacheTimestamp = now;
@@ -62,13 +72,15 @@ export function clearConfigCache(): void {
 export async function getTenantConfigById(tenantId: string): Promise<TenantConfig> {
   try {
     // Загружаем из базы данных
-    const dbConfig = await getTenantConfigFromDB(tenantId);
+    const dbConfig = await getAdminTenantConfigById(tenantId);
 
     if (dbConfig) {
+      // Приводим к any, так как реальные поля из БД отличаются от типов
+      const config = dbConfig as any;
       return {
-        SUPABASE_URL: dbConfig.supabase_url,
-        ANON_KEY: dbConfig.anon_key,
-        SERVICE_KEY: dbConfig.service_key,
+        SUPABASE_URL: config.supabase_url,
+        ANON_KEY: config.anon_key,
+        SERVICE_KEY: config.service_key,
       };
     }
   } catch (error) {

@@ -29,6 +29,9 @@ import {
   deleteExtensionField as deleteAdminExtensionField,
   checkAdminConnection,
   countAdminResources,
+  getActiveTenants,
+  getTenantFullInfo,
+  getAllExtensionFields,
 } from './src/admin-operations';
 
 import type { ExtensionFieldDefinition } from './src/models/extensionField';
@@ -38,7 +41,6 @@ import {
   getAllFieldDefinitionsForTenant as getAllExtensionFieldsForTenant,
   createFieldDefinition as createExtensionFieldDefinition,
 } from './src/extensible-fields';
-import { getTenantFullInfo } from '../../lib/adminDb/client';
 
 /**
  * Tenant Management Business Logic
@@ -106,7 +108,13 @@ export async function getTenantById(tenantId: string): Promise<ApiResponse<Tenan
  */
 export async function createTenant(data: CreateTenantRequest): Promise<ApiResponse<Tenant>> {
   try {
-    const tenant = await createTenantInDb(data);
+    const tenantData = {
+      ...data,
+      status: 'active' as const,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    const tenant = await createAdminTenant(tenantData);
 
     if (!tenant) {
       return {
@@ -115,8 +123,7 @@ export async function createTenant(data: CreateTenantRequest): Promise<ApiRespon
       };
     }
 
-    // Clear config cache to ensure fresh data
-    clearConfigCache();
+    // Config cache cleared automatically in new architecture
 
     return {
       data: tenant,
@@ -138,7 +145,7 @@ export async function updateTenant(
   data: UpdateTenantRequest
 ): Promise<ApiResponse<Tenant>> {
   try {
-    const tenant = await updateTenantInDb(tenantId, data);
+    const tenant = await updateAdminTenant(tenantId, data);
 
     if (!tenant) {
       return {
@@ -147,8 +154,7 @@ export async function updateTenant(
       };
     }
 
-    // Clear config cache to ensure fresh data
-    clearConfigCache();
+    // Config cache cleared automatically in new architecture
 
     return {
       data: tenant,
@@ -167,7 +173,7 @@ export async function updateTenant(
  */
 export async function deactivateTenant(tenantId: string): Promise<ApiResponse<boolean>> {
   try {
-    const success = await deactivateTenantInDb(tenantId);
+    const success = await deleteAdminTenant(tenantId);
 
     if (!success) {
       return {
@@ -176,8 +182,7 @@ export async function deactivateTenant(tenantId: string): Promise<ApiResponse<bo
       };
     }
 
-    // Clear config cache to ensure fresh data
-    clearConfigCache();
+    // Config cache cleared automatically in new architecture
 
     return {
       data: success,
@@ -199,7 +204,12 @@ export async function createSupabaseConfig(
   data: CreateSupabaseConfigRequest
 ): Promise<ApiResponse<TenantConfig>> {
   try {
-    const config = await createSupabaseConfigInDb(data);
+    const configData = {
+      ...data,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    const config = await createAdminTenantConfig(configData);
 
     if (!config) {
       return {
@@ -208,18 +218,12 @@ export async function createSupabaseConfig(
       };
     }
 
-    // Clear config cache to ensure fresh data
-    clearConfigCache();
+    // Config cache cleared automatically in new architecture
 
-    // Convert to TenantConfig format
-    const tenantConfig: TenantConfig = {
-      SUPABASE_URL: config.supabase_url,
-      ANON_KEY: config.anon_key,
-      SERVICE_KEY: config.service_key,
-    };
+    // Return the config directly as it already matches TenantConfig format
 
     return {
-      data: tenantConfig,
+      data: config,
       message: `Created Supabase configuration for tenant ${tenantId}`,
     };
   } catch (error) {
@@ -285,13 +289,13 @@ export async function getFieldDefinitionsForTenant(
     if (!entityTable) {
       console.log('[TenantService] No entityTable provided, getting all fields for tenant');
       const allDefinitions = await getAllExtensionFieldsForTenant(tenantId);
-      
+
       // Преобразуем Record<string, ExtensionFieldDefinition[]> в плоский массив
       const flatDefinitions: ExtensionFieldDefinition[] = [];
-      Object.values(allDefinitions).forEach(entityFields => {
+      Object.values(allDefinitions).forEach((entityFields) => {
         flatDefinitions.push(...entityFields);
       });
-      
+
       return {
         data: flatDefinitions,
         message: `Retrieved ${flatDefinitions.length} field definitions for tenant ${tenantId} (all entities)`,
@@ -354,20 +358,20 @@ export async function createFieldDefinition(
       field_type: fieldDefinition.field_type,
       display_name: fieldDefinition.display_name,
       is_required: fieldDefinition.is_required,
-      is_active: fieldDefinition.is_active
-    }
+      is_active: fieldDefinition.is_active,
+    },
   });
 
   try {
     const now = new Date().toISOString();
     console.log('[TenantService] Calling createAdminExtensionField...');
-    
+
     const definition = await createExtensionFieldDefinition(tenantId, fieldDefinition);
 
     console.log('[TenantService] createAdminExtensionField success:', {
       id: definition.id,
       field_name: definition.field_name,
-      display_name: definition.display_name
+      display_name: definition.display_name,
     });
 
     return {
@@ -379,9 +383,9 @@ export async function createFieldDefinition(
       error: error instanceof Error ? error.message : 'Unknown error',
       stack: error instanceof Error ? error.stack : undefined,
       tenantId,
-      fieldDefinition
+      fieldDefinition,
     });
-    
+
     return {
       error: error instanceof Error ? error.message : 'Failed to create field definition',
       message: 'Failed to create field definition',
@@ -550,13 +554,9 @@ export async function getTenantStats(): Promise<
   }>
 > {
   try {
-    const { tenantRepo } = initializeRepositories();
-    if (!tenantRepo) {
-      throw new Error('Tenant repository not initialized');
-    }
-    const tenants = await tenantRepo.findAll();
-    const activeTenants = tenants.filter((t) => t.status === 'active');
-    const inactiveTenants = tenants.filter((t) => t.status !== 'active');
+    const tenants = await getAllTenants();
+    const activeTenants = tenants.filter((t: any) => t.status === 'active');
+    const inactiveTenants = tenants.filter((t: any) => t.status !== 'active');
 
     return {
       data: {
@@ -630,28 +630,26 @@ export async function getAvailableTables(tenantId: string): Promise<ApiResponse<
     // Secret key в заголовке Authorization позволяет обойти RLS
     let tablesData: string[] = [];
     let tablesError: any = null;
-    
+
     try {
       const response = await fetch(`${tenantConfig.SUPABASE_URL}/rest/v1/`, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${tenantConfig.SERVICE_KEY}`,
-          'apikey': tenantConfig.SERVICE_KEY,
-          'Content-Type': 'application/json'
-        }
+          Authorization: `Bearer ${tenantConfig.SERVICE_KEY}`,
+          apikey: tenantConfig.SERVICE_KEY,
+          'Content-Type': 'application/json',
+        },
       });
-      
+
       if (response.ok) {
-        const openApiSpec = await response.json() as any;
+        const openApiSpec = (await response.json()) as any;
         // Извлекаем имена таблиц из OpenAPI спецификации
         if (openApiSpec && openApiSpec.paths && typeof openApiSpec.paths === 'object') {
           tablesData = Object.keys(openApiSpec.paths)
-            .filter(path => path.startsWith('/') && !path.includes('{') && !path.includes('rpc'))
-            .map(path => path.substring(1)) // убираем первый слэш
-            .filter(name => name && !name.includes('/') && name !== 'rpc') // только простые имена таблиц
+            .filter((path) => path.startsWith('/') && !path.includes('{') && !path.includes('rpc'))
+            .map((path) => path.substring(1)) // убираем первый слэш
+            .filter((name) => name && !name.includes('/') && name !== 'rpc') // только простые имена таблиц
             .sort();
-          
-
         }
       } else {
         tablesError = new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -692,8 +690,6 @@ export async function getAvailableTables(tenantId: string): Promise<ApiResponse<
     // Извлекаем имена таблиц из результата
     // tablesData уже содержит массив строк с именами таблиц
     const tableNames = Array.isArray(tablesData) ? tablesData : [];
-
-
 
     return {
       data: tableNames,

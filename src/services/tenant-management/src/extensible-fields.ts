@@ -1,4 +1,4 @@
-import { getActiveTenants, checkAdminConnection } from '../../../lib/adminDb/client';
+import { getActiveTenants, checkAdminConnection } from './admin-operations';
 import { createClient } from '@supabase/supabase-js';
 import { getAdminSupabaseUrl, getAdminSupabaseServiceKey } from '../service';
 
@@ -185,7 +185,7 @@ export async function getAllFieldDefinitionsForTenant(
       if (!result[definition.entity_table]) {
         result[definition.entity_table] = [];
       }
-      result[definition.entity_table].push(definition);
+      result[definition.entity_table]?.push(definition);
     });
   }
 

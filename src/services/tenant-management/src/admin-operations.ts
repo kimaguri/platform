@@ -1,6 +1,6 @@
 import { getAdminAdapter } from '../../../connectors/registry/connector-registry';
 import type { Adapter, QueryParams } from '../../../connectors/base';
-import type { Tenant, TenantConfig } from './models/tenant';
+import type { Tenant, TenantConfig, TenantFullInfo } from './models/tenant';
 import type { ExtensionFieldDefinition } from './models/extensionField';
 
 /**
@@ -17,7 +17,8 @@ export async function queryAdminResource<T = any>(
   params?: QueryParams
 ): Promise<T[]> {
   const adapter = getAdminAdapter(resource);
-  return adapter.query(params) as Promise<T[]>;
+  await adapter.connect();
+  return await adapter.query(params) as T[];
 }
 
 export async function getAdminResource<T = any>(
@@ -25,6 +26,7 @@ export async function getAdminResource<T = any>(
   id: string
 ): Promise<T | null> {
   const adapter = getAdminAdapter(resource);
+  await adapter.connect();
   return adapter.queryOne(id) as Promise<T | null>;
 }
 
@@ -33,6 +35,7 @@ export async function createAdminResource<T = any>(
   data: Omit<T, 'id'>
 ): Promise<T> {
   const adapter = getAdminAdapter(resource);
+  await adapter.connect();
   return adapter.insert(data) as Promise<T>;
 }
 
@@ -42,6 +45,7 @@ export async function updateAdminResource<T = any>(
   data: Partial<T>
 ): Promise<T | null> {
   const adapter = getAdminAdapter(resource);
+  await adapter.connect();
   return adapter.update(id, data) as Promise<T | null>;
 }
 
@@ -50,6 +54,7 @@ export async function deleteAdminResource(
   id: string
 ): Promise<boolean> {
   const adapter = getAdminAdapter(resource);
+  await adapter.connect();
   return adapter.delete(id);
 }
 
@@ -58,8 +63,8 @@ export async function countAdminResources(
   filter?: Record<string, any>
 ): Promise<number> {
   const adapter = getAdminAdapter(resource);
-  const results = await adapter.query({ filter });
-  return results.length;
+  await adapter.connect();
+  return adapter.count(filter);
 }
 
 /**
@@ -67,6 +72,35 @@ export async function countAdminResources(
  */
 export async function getAllTenants(params?: QueryParams): Promise<Tenant[]> {
   return queryAdminResource<Tenant>('tenants', params);
+}
+
+/**
+ * Получает список всех активных тенантов
+ */
+export async function getActiveTenants(): Promise<Tenant[]> {
+  return queryAdminResource<Tenant>('tenants', {
+    filter: { status: 'active' },
+    orderBy: [{ field: 'created_at', direction: 'desc' }]
+  });
+}
+
+/**
+ * Получает полную информацию о тенанте
+ */
+export async function getTenantFullInfo(tenantId: string): Promise<TenantFullInfo | null> {
+  try {
+    const adapter = getAdminAdapter('tenant_full_info');
+    await adapter.connect();
+    const results = await adapter.query({
+      filter: { tenant_id: tenantId },
+      limit: 1
+    }) as TenantFullInfo[];
+    
+    return results && results.length > 0 ? (results[0] || null) : null;
+  } catch (error) {
+    console.error('Error fetching tenant full info:', error);
+    return null;
+  }
 }
 
 export async function getTenantById(tenantId: string): Promise<Tenant | null> {
@@ -99,7 +133,7 @@ export async function getTenantConfigById(tenantId: string): Promise<TenantConfi
   const configs = await queryAdminResource<TenantConfig>('tenant_supabase_configs', {
     filter: { tenant_id: tenantId }
   });
-  return configs.length > 0 ? configs[0] : null;
+  return configs.length > 0 ? (configs[0] || null) : null;
 }
 
 export async function createTenantConfig(data: Omit<TenantConfig, 'id'>): Promise<TenantConfig> {
