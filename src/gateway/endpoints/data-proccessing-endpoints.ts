@@ -38,6 +38,33 @@ interface UpdateEntityRequest {
   entityData: Payload; // Изменено с data на entityData типа Payload
 }
 
+// Типы для search endpoint с фильтрацией через body
+interface ExtensionFieldsFilter {
+  field: string;
+  operator: 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte' | 'like' | 'in' | 'not_in';
+  value: unknown;
+}
+
+interface ExtensionFieldsSorter {
+  field: string;
+  direction: 'asc' | 'desc';
+}
+
+interface EntitySearchRequest {
+  filters?: ExtensionFieldsFilter[];
+  select?: string;
+  pagination?: {
+    page?: number;
+    limit?: number;
+    offset?: number;
+  };
+  sort?: ExtensionFieldsSorter[];
+  meta?: {
+    select?: string;
+    [key: string]: any;
+  };
+}
+
 /**
  * Data Processing Endpoints - /api/v1/data/*
  */
@@ -243,6 +270,92 @@ export const listEntityRecords = api(
     } catch (error) {
       throw new Error(
         `Failed to list entities: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+);
+
+/**
+ * Search entities with complex filters via POST body
+ * Best practice approach for complex queries with filters, sorting, and pagination
+ */
+export const searchEntityRecords = api(
+  { method: 'POST', path: '/api/v1/entity/:entity/search', expose: true, auth: true },
+  async ({
+    entity,
+    filters = [],
+    select,
+    pagination = {},
+    sort = [],
+    meta,
+  }: {
+    entity: string;
+    filters?: ExtensionFieldsFilter[];
+    select?: string;
+    pagination?: {
+      page?: number;
+      limit?: number;
+      offset?: number;
+    };
+    sort?: ExtensionFieldsSorter[];
+    meta?: {
+      select?: string;
+    };
+  }): Promise<ApiResponse<ContentItem[]>> => {
+    const authData = getAuthData() as AuthData;
+
+    try {
+      // Extract pagination parameters
+      const { page, limit, offset } = pagination;
+      const finalLimit = limit || 50;
+      let finalOffset = offset || 0;
+      
+      // If page is provided, convert it to offset (page is 1-based)
+      if (page && page > 0) {
+        finalOffset = (page - 1) * finalLimit;
+      }
+
+      // Convert sort array to sorters format expected by data-processing
+      const sorters = sort.map(sorter => ({
+        field: sorter.field,
+        order: sorter.direction
+      }));
+
+      // Proxy to data-processing service
+      const result = await dataProcessingClient.listEntityRecords({
+        entity,
+        limit: finalLimit,
+        offset: finalOffset,
+        select,
+        filters: filters.length > 0 ? JSON.stringify(filters) : undefined,
+        sorters: sorters.length > 0 ? JSON.stringify(sorters) : undefined,
+        meta: meta ? JSON.stringify(meta) : undefined,
+      });
+
+      // Check if the result contains an error
+      if ('error' in result && result.error) {
+        throw new Error(result.error);
+      }
+
+      // Extract data from the nested structure returned by data-processing service
+      const responseData = result.data || result;
+      const entities = responseData.data || [];
+      const total = responseData.total || 0;
+      const pagination_result = responseData.pagination || {};
+
+      return {
+        data: entities,
+        message: result.message || `Found ${entities.length} ${entity} entities`,
+        meta: {
+          total: total,
+          limit: finalLimit,
+          page: Math.floor(finalOffset / finalLimit) + 1,
+          hasMore: finalOffset + finalLimit < total,
+        },
+      };
+    } catch (error) {
+      throw new Error(
+        `Failed to search entities: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
     }
   }

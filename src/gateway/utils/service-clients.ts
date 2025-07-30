@@ -518,5 +518,6 @@ export interface ApiResponse<T = any> {
     total?: number;
     page?: number;
     limit?: number;
+    hasMore?: boolean;
   };
 }

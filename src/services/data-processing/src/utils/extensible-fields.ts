@@ -435,6 +435,11 @@ export async function getEntitiesWithExtensions(
   // Строим запрос с фильтрацией и сортировкой
   const query = buildExtensibleFieldsQuery(filters, sorters, fieldDefinitions);
 
+  // Отладочная информация
+  console.log('[DEBUG] Input filters:', JSON.stringify(filters, null, 2));
+  console.log('[DEBUG] Built query.where:', JSON.stringify(query.where, null, 2));
+  console.log('[DEBUG] Built query.orderBy:', JSON.stringify(query.orderBy, null, 2));
+
   // Выполняем запрос используя правильные методы адаптера
   const entities = await adapter.query({
     filter: query.where,
@@ -447,6 +452,8 @@ export async function getEntitiesWithExtensions(
     offset,
     meta,
   });
+
+  console.log('[DEBUG] Query result count:', entities.length);
 
   // Получаем общее количество записей
   const total = await adapter.count(query.where);

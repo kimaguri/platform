@@ -62,9 +62,36 @@ export default function createSupabaseAdapter<T = any>(
 
       // Apply filters
       if (params.filter) {
-        Object.entries(params.filter).forEach(([key, value]) => {
-          if (value !== undefined && value !== null) {
-            query = query.eq(key, value);
+        Object.entries(params.filter).forEach(([key, filterValue]) => {
+          if (filterValue !== undefined && filterValue !== null) {
+            // Обрабатываем объекты фильтров из buildFilterCondition
+            if (typeof filterValue === 'object' && filterValue !== null) {
+              if ('equals' in filterValue) {
+                query = query.eq(key, filterValue.equals);
+              } else if ('not' in filterValue) {
+                query = query.neq(key, filterValue.not);
+              } else if ('gt' in filterValue) {
+                query = query.gt(key, filterValue.gt);
+              } else if ('gte' in filterValue) {
+                query = query.gte(key, filterValue.gte);
+              } else if ('lt' in filterValue) {
+                query = query.lt(key, filterValue.lt);
+              } else if ('lte' in filterValue) {
+                query = query.lte(key, filterValue.lte);
+              } else if ('contains' in filterValue) {
+                query = query.ilike(key, `%${filterValue.contains}%`);
+              } else if ('in' in filterValue) {
+                query = query.in(key, filterValue.in);
+              } else if ('notIn' in filterValue) {
+                query = query.not(key, 'in', `(${filterValue.notIn.join(',')})`);
+              } else {
+                // Fallback для неизвестных объектов - используем как есть
+                query = query.eq(key, filterValue);
+              }
+            } else {
+              // Простое значение - используем eq
+              query = query.eq(key, filterValue);
+            }
           }
         });
       }
@@ -190,9 +217,37 @@ export default function createSupabaseAdapter<T = any>(
     async count(filter: Record<string, any> = {}): Promise<number> {
       let query = client.from(config.table).select('*', { count: 'exact', head: true });
 
-      Object.entries(filter).forEach(([key, value]) => {
-        if (value !== undefined && value !== null) {
-          query = query.eq(key, value);
+      // Apply filters - используем ту же логику, что и в query
+      Object.entries(filter).forEach(([key, filterValue]) => {
+        if (filterValue !== undefined && filterValue !== null) {
+          // Обрабатываем объекты фильтров из buildFilterCondition
+          if (typeof filterValue === 'object' && filterValue !== null) {
+            if ('equals' in filterValue) {
+              query = query.eq(key, filterValue.equals);
+            } else if ('not' in filterValue) {
+              query = query.neq(key, filterValue.not);
+            } else if ('gt' in filterValue) {
+              query = query.gt(key, filterValue.gt);
+            } else if ('gte' in filterValue) {
+              query = query.gte(key, filterValue.gte);
+            } else if ('lt' in filterValue) {
+              query = query.lt(key, filterValue.lt);
+            } else if ('lte' in filterValue) {
+              query = query.lte(key, filterValue.lte);
+            } else if ('contains' in filterValue) {
+              query = query.ilike(key, `%${filterValue.contains}%`);
+            } else if ('in' in filterValue) {
+              query = query.in(key, filterValue.in);
+            } else if ('notIn' in filterValue) {
+              query = query.not(key, 'in', `(${filterValue.notIn.join(',')})`);
+            } else {
+              // Fallback для неизвестных объектов - используем как есть
+              query = query.eq(key, filterValue);
+            }
+          } else {
+            // Простое значение - используем eq
+            query = query.eq(key, filterValue);
+          }
         }
       });
 
