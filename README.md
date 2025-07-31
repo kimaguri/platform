@@ -197,9 +197,12 @@ export default new Service('service-name', {
 - `DELETE /tenants/:id` - Delete tenant
 - `GET /tenants/extensions/available-tables` - Get available tables
 - `GET /tenants/:tenantId/fields` - Get extensible fields
+- `GET /tenants/:tenantId/fields/all` - Get all extensible fields for tenant
 - `POST /tenants/:tenantId/fields` - Create extensible field
 - `PUT /tenants/fields/:fieldId` - Update extensible field
 - `DELETE /tenants/fields/:fieldId` - Delete extensible field
+- `GET /tenants/extensible-fields/stats` - Get extensible fields statistics
+- `GET /tenants/extensible-fields/supported-entities` - Get supported entities
 
 **User Management:**
 
@@ -208,9 +211,14 @@ export default new Service('service-name', {
 - `POST /auth/logout` - User logout
 - `GET /users/me` - Get current user profile
 - `PUT /users/me` - Update profile
-- `GET /bootstrap` - Get all application data in one request
+- `POST /auth/refresh` - Refresh authentication token
 
-**Content Management:**
+**Bootstrap & Configuration:**
+
+- `GET /bootstrap` - Get all application data in one request
+- `GET /config` - Get tenant configuration
+
+**Data Processing:**
 
 - `GET /entities/:type` - List entities
 - `GET /entities/:type/:id` - Get entity
@@ -218,6 +226,7 @@ export default new Service('service-name', {
 - `PUT /entities/:type/:id` - Update entity
 - `DELETE /entities/:type/:id` - Delete entity
 - `POST /entities/:type/search` - Search entities with filters
+- `GET /entities/:type?select=*, nested_field(*)` - Get entities with nested data
 
 **Entity Conversion:**
 
@@ -237,6 +246,12 @@ export default new Service('service-name', {
 - `GET /events/stats` - Get event statistics
 - `GET /audit/logs` - Get audit trail
 - `GET /notifications/history` - Get notification history
+
+**Dictionary Management:**
+
+- `GET /entities/dictionary` - Get dictionaries
+- `GET /entities/dictionary_value` - Get dictionary values
+- `GET /entities/dictionary?select=*, dictionary_value(*)` - Get dictionaries with embedded values
 
 ### API Gateway (`/api/v1/`)
 
@@ -275,12 +290,13 @@ export default new Service('service-name', {
 
 ### Environment Variables
 
-The platform uses comprehensive environment configuration:
+The platform uses comprehensive environment configuration. For Docker deployments, environment variables are defined in `docker-compose.yml`.
 
 ```bash
 # Application
 NODE_ENV=development
 PORT=4000
+HOST=0.0.0.0
 LOG_LEVEL=debug
 
 # Database (Legacy - используйте Encore secrets для production)
@@ -296,6 +312,9 @@ ENABLE_RATE_LIMITING=true
 # Performance
 REQUEST_TIMEOUT=30000
 RATE_LIMIT_REQUESTS=100
+
+# CORS
+CORS_ORIGINS=["http://localhost:3000", "http://localhost:5173"]
 ```
 
 ### 🔐 Система секретов Encore.ts
@@ -307,20 +326,42 @@ RATE_LIMIT_REQUESTS=100
 ```bash
 # Создайте файл .secrets.local.cue
 AdminSupabaseUrl: "https://your-admin-project.supabase.co"
-AdminSupabaseServiceKey: "your-service-key"
+AdminSupabaseServiceKey: "your-service-role-key"
 ```
 
-**Production:**
+**Production/self-host деплой:**
 
 ```bash
-# Установите секреты через CLI
-encore secret set --type prod AdminSupabaseUrl
-encore secret set --type prod AdminSupabaseServiceKey
+# Установите секреты через CLI для всех окружений
+encore secret set --type dev,prod,local,pr AdminSupabaseUrl
+encore secret set --type dev,prod,local,pr AdminSupabaseServiceKey
 ```
 
-📖 Подробное руководство: [`docs/secrets-setup-guide.md`](docs/secrets-setup-guide.md)
+📖 Подробное руководство: [`docs/SECRETS_SETUP.md`](docs/SECRETS_SETUP.md)
 
 See `env.example` for complete configuration options.
+
+### 🐳 Docker Deployment
+
+Для запуска приложения в Docker используйте docker-compose:
+
+```bash
+# Запуск всех сервисов
+docker-compose up -d
+
+# Просмотр логов
+docker-compose logs -f
+
+# Остановка сервисов
+docker-compose down
+```
+
+Сервисы запускаются на следующих портах:
+- API Gateway: 4000
+- Tenant Management: 4001 (внутренний)
+- User Management: 4002 (внутренний)
+- Data Processing: 4003 (внутренний)
+- Event Management: 4004 (внутренний)
 
 ### TypeScript Path Mapping
 

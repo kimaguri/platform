@@ -1,0 +1,79 @@
+version: '3.8'
+
+services:
+  # API Gateway - Main entry point
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "4000:4000"
+    environment:
+      - NODE_ENV=production
+      - PORT=4000
+      - HOST=0.0.0.0
+      - LOG_LEVEL=info
+      - CORS_ORIGINS=["http://localhost:3000", "http://localhost:5173"]
+      # Service ports for internal communication
+      - TENANT_MANAGEMENT_PORT=4001
+      - USER_MANAGEMENT_PORT=4002
+      - DATA_PROCESSING_PORT=4003
+      - EVENT_MANAGEMENT_PORT=4004
+    networks:
+      - simplx-network
+
+  # Tenant Management Service
+  tenant-management:
+    build:
+      context: .
+      dockerfile: Dockerfile.tenant-management
+    environment:
+      - NODE_ENV=production
+      - SERVICE_PORT=4001
+    expose:
+      - "4001"
+    networks:
+      - simplx-network
+
+  # User Management Service
+  user-management:
+    build:
+      context: .
+      dockerfile: Dockerfile.user-management
+    environment:
+      - NODE_ENV=production
+      - SERVICE_PORT=4002
+    expose:
+      - "4002"
+    networks:
+      - simplx-network
+
+  # Data Processing Service
+  data-processing:
+    build:
+      context: .
+      dockerfile: Dockerfile.data-processing
+    environment:
+      - NODE_ENV=production
+      - SERVICE_PORT=4003
+    expose:
+      - "4003"
+    networks:
+      - simplx-network
+
+  # Event Management Service
+  event-management:
+    build:
+      context: .
+      dockerfile: Dockerfile.event-management
+    environment:
+      - NODE_ENV=production
+      - SERVICE_PORT=4004
+    expose:
+      - "4004"
+    networks:
+      - simplx-network
+
+networks:
+  simplx-network:
+    driver: bridge

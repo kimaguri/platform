@@ -31,7 +31,11 @@
     "type-check": "tsc --noEmit --skipLibCheck",
     "gen": "encore gen client",
     "clean": "rm -rf dist encore.gen",
-    "start": "node dist/main.js"
+    "start": "encore run --service=gateway",
+    "start:tenant-management": "encore run --service=tenant-management",
+    "start:user-management": "encore run --service=user-management",
+    "start:data-processing": "encore run --service=data-processing",
+    "start:event-management": "encore run --service=event-management"
   },
   "devDependencies": {
     "@types/node": "^20.5.7",

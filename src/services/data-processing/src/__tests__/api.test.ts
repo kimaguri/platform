@@ -8,11 +8,11 @@ vi.mock('@encore/backend', () => ({
 
 // Mock service modules
 vi.mock('../service', () => ({
-  listEntitiesWithExtensions: vi.fn(),
-  createEntityWithExtensions: vi.fn(),
-  updateEntityWithExtensions: vi.fn(),
-  deleteEntityWithExtensions: vi.fn(),
-  getEntityWithExtensions: vi.fn(),
+  getEntityList: vi.fn(),
+  createEntityRecord: vi.fn(),
+  updateEntityRecord: vi.fn(),
+  deleteEntityRecord: vi.fn(),
+  getEntityRecordData: vi.fn(),
 }));
 
 vi.mock('../extensible-fields', () => ({
@@ -44,7 +44,7 @@ describe('Content Management API', () => {
   });
 
   describe('Universal RPC Endpoints', () => {
-    describe('listEntitiesWithExtensions', () => {
+    describe('getEntityList', () => {
       it('should list entities with extensions successfully', async () => {
         const mockEntities = [
           {
@@ -56,7 +56,7 @@ describe('Content Management API', () => {
           },
         ];
 
-        mockService.listEntitiesWithExtensions.mockResolvedValue({
+        mockService.getEntityList.mockResolvedValue({
           data: mockEntities,
           pagination: {
             page: 1,
@@ -67,17 +67,17 @@ describe('Content Management API', () => {
         });
 
         // Import the API function
-        const { listEntitiesWithExtensions } = await import('../api');
+        const { getEntityList } = await import('../../api');
 
-        const result = await listEntitiesWithExtensions({
+        const result = await getEntityList({
           entityTable: 'users',
           filters: JSON.stringify([{ field: 'name', operator: 'contains', value: 'test' }]),
           sorters: JSON.stringify([{ field: 'created_at', order: 'desc' }]),
-          page: 1,
-          pageSize: 10,
+          limit: 10,
+          offset: 0,
         });
 
-        expect(mockService.listEntitiesWithExtensions).toHaveBeenCalledWith(
+        expect(mockService.getEntityList).toHaveBeenCalledWith(
           'test-tenant',
           'users',
           [{ field: 'name', operator: 'contains', value: 'test' }],
@@ -98,10 +98,10 @@ describe('Content Management API', () => {
       });
 
       it('should handle invalid JSON filters gracefully', async () => {
-        const { listEntitiesWithExtensions } = await import('../api');
+        const { getEntityList } = await import('../../api');
 
         await expect(
-          listEntitiesWithExtensions({
+          getEntityList({
             entityTable: 'users',
             filters: 'invalid-json',
             sorters: '[]',
@@ -112,20 +112,20 @@ describe('Content Management API', () => {
       });
 
       it('should use default pagination when not provided', async () => {
-        mockService.listEntitiesWithExtensions.mockResolvedValue({
+        mockService.getEntityList.mockResolvedValue({
           data: [],
           pagination: { page: 1, pageSize: 10, total: 0, totalPages: 0 },
         });
 
-        const { listEntitiesWithExtensions } = await import('../api');
+        const { getEntityList } = await import('../../api');
 
-        await listEntitiesWithExtensions({
+        await getEntityList({
           entityTable: 'users',
           filters: '[]',
           sorters: '[]',
         });
 
-        expect(mockService.listEntitiesWithExtensions).toHaveBeenCalledWith(
+        expect(mockService.getEntityList).toHaveBeenCalledWith(
           'test-tenant',
           'users',
           [],
@@ -136,34 +136,34 @@ describe('Content Management API', () => {
       });
     });
 
-    describe('createEntityWithExtensions', () => {
+    describe('createEntityRecord', () => {
       it('should create entity with extensions successfully', async () => {
         const mockEntity = {
           id: '1',
-          name: 'New Entity',
+          baseFields: { name: 'New Entity' },
           extensions: {
             custom_field: 'custom_value',
           },
         };
 
-        mockService.createEntityWithExtensions.mockResolvedValue(mockEntity);
+        mockService.createEntityRecord.mockResolvedValue(mockEntity);
 
-        const { createEntityWithExtensions } = await import('../api');
+        const { createEntityRecord } = await import('../../api');
 
-        const result = await createEntityWithExtensions({
+        const result = await createEntityRecord({
           entityTable: 'users',
           entityData: {
-            name: 'New Entity',
+            baseFields: { name: 'New Entity' },
           },
-          extensionData: {
+          extensionFieldsData: {
             custom_field: 'custom_value',
           },
         });
 
-        expect(mockService.createEntityWithExtensions).toHaveBeenCalledWith(
+        expect(mockService.createEntityRecord).toHaveBeenCalledWith(
           'test-tenant',
           'users',
-          { name: 'New Entity' },
+          { baseFields: { name: 'New Entity' }, extensions: {} },
           { custom_field: 'custom_value' }
         );
 
@@ -174,21 +174,21 @@ describe('Content Management API', () => {
       });
 
       it('should handle creation errors', async () => {
-        mockService.createEntityWithExtensions.mockRejectedValue(new Error('Creation failed'));
+        mockService.createEntityRecord.mockRejectedValue(new Error('Creation failed'));
 
-        const { createEntityWithExtensions } = await import('../api');
+        const { createEntityRecord } = await import('../../api');
 
         await expect(
-          createEntityWithExtensions({
+          createEntityRecord({
             entityTable: 'users',
             entityData: { name: 'Test' },
-            extensionData: {},
+            extensionFieldsData: {},
           })
         ).rejects.toThrow('Creation failed');
       });
     });
 
-    describe('updateEntityWithExtensions', () => {
+    describe('updateEntityRecord', () => {
       it('should update entity with extensions successfully', async () => {
         const mockEntity = {
           id: '1',
@@ -198,22 +198,23 @@ describe('Content Management API', () => {
           },
         };
 
-        mockService.updateEntityWithExtensions.mockResolvedValue(mockEntity);
+        mockService.updateEntityRecord.mockResolvedValue(mockEntity);
 
-        const { updateEntityWithExtensions } = await import('../api');
+        const { updateEntityRecord } = await import('../../api');
 
-        const result = await updateEntityWithExtensions({
+        const result = await updateEntityRecord({
           entityTable: 'users',
-          entityId: '1',
+          recordId: '1',
           entityData: {
-            name: 'Updated Entity',
+            baseFields: { name: 'Updated Entity' },
+            extensions: {},
           },
-          extensionData: {
+          extensionFieldsData: {
             custom_field: 'updated_value',
           },
         });
 
-        expect(mockService.updateEntityWithExtensions).toHaveBeenCalledWith(
+        expect(mockService.updateEntityRecord).toHaveBeenCalledWith(
           'test-tenant',
           'users',
           '1',
@@ -228,18 +229,18 @@ describe('Content Management API', () => {
       });
     });
 
-    describe('deleteEntityWithExtensions', () => {
+    describe('deleteEntityRecord', () => {
       it('should delete entity successfully', async () => {
-        mockService.deleteEntityWithExtensions.mockResolvedValue(true);
+        mockService.deleteEntityRecord.mockResolvedValue(true);
 
-        const { deleteEntityWithExtensions } = await import('../api');
+        const { deleteEntityRecord } = await import('../../api');
 
-        const result = await deleteEntityWithExtensions({
+        const result = await deleteEntityRecord({
           entityTable: 'users',
-          entityId: '1',
+          recordId: '1',
         });
 
-        expect(mockService.deleteEntityWithExtensions).toHaveBeenCalledWith(
+        expect(mockService.deleteEntityRecord).toHaveBeenCalledWith(
           'test-tenant',
           'users',
           '1'
@@ -252,20 +253,20 @@ describe('Content Management API', () => {
       });
 
       it('should handle deletion errors', async () => {
-        mockService.deleteEntityWithExtensions.mockRejectedValue(new Error('Deletion failed'));
+        mockService.deleteEntityRecord.mockRejectedValue(new Error('Deletion failed'));
 
-        const { deleteEntityWithExtensions } = await import('../api');
+        const { deleteEntityRecord } = await import('../../api');
 
         await expect(
-          deleteEntityWithExtensions({
+          deleteEntityRecord({
             entityTable: 'users',
-            entityId: '1',
+            recordId: '1',
           })
         ).rejects.toThrow('Deletion failed');
       });
     });
 
-    describe('getEntityWithExtensions', () => {
+    describe('getEntityRecordData', () => {
       it('should get single entity with extensions successfully', async () => {
         const mockEntity = {
           id: '1',
@@ -275,16 +276,16 @@ describe('Content Management API', () => {
           },
         };
 
-        mockService.getEntityWithExtensions.mockResolvedValue(mockEntity);
+        mockService.getEntityRecordData.mockResolvedValue(mockEntity);
 
-        const { getEntityWithExtensions } = await import('../api');
+        const { getEntityRecordData } = await import('../../api');
 
-        const result = await getEntityWithExtensions({
+        const result = await getEntityRecordData({
           entityTable: 'users',
-          entityId: '1',
+          recordId: '1',
         });
 
-        expect(mockService.getEntityWithExtensions).toHaveBeenCalledWith(
+        expect(mockService.getEntityRecordData).toHaveBeenCalledWith(
           'test-tenant',
           'users',
           '1'
@@ -297,12 +298,12 @@ describe('Content Management API', () => {
       });
 
       it('should handle not found errors', async () => {
-        mockService.getEntityWithExtensions.mockRejectedValue(new Error('Entity not found'));
+        mockService.getEntityRecordData.mockRejectedValue(new Error('Entity not found'));
 
-        const { getEntityWithExtensions } = await import('../api');
+        const { getEntityRecordData } = await import('../../api');
 
         await expect(
-          getEntityWithExtensions({
+          getEntityRecordData({
             entityTable: 'users',
             entityId: 'nonexistent',
           })
@@ -314,21 +315,22 @@ describe('Content Management API', () => {
   describe('Entity-specific Endpoints', () => {
     describe('User Management', () => {
       it('should list users with extensions', async () => {
-        mockService.listEntitiesWithExtensions.mockResolvedValue({
+        mockService.getEntityList.mockResolvedValue({
           data: [{ id: '1', name: 'User 1', extensions: {} }],
           pagination: { page: 1, pageSize: 10, total: 1, totalPages: 1 },
         });
 
-        const { listUsersWithExtensions } = await import('../api');
+        const { getEntityList } = await import('../../api');
 
-        const result = await listUsersWithExtensions({
+        const result = await getEntityList({
+          entityTable: 'users',
           filters: '[]',
           sorters: '[]',
-          page: 1,
-          pageSize: 10,
+          limit: 10,
+          offset: 0,
         });
 
-        expect(mockService.listEntitiesWithExtensions).toHaveBeenCalledWith(
+        expect(mockService.getEntityList).toHaveBeenCalledWith(
           'test-tenant',
           'users',
           [],
@@ -344,29 +346,29 @@ describe('Content Management API', () => {
       it('should create user with extensions', async () => {
         const mockUser = {
           id: '1',
-          name: 'New User',
+          baseFields: { name: 'New User' },
           email: 'user@example.com',
           extensions: { department: 'Engineering' },
         };
 
-        mockService.createEntityWithExtensions.mockResolvedValue(mockUser);
+        mockService.createEntityRecord.mockResolvedValue(mockUser);
 
-        const { createUserWithExtensions } = await import('../api');
+        const { createEntityRecord } = await import('../../api');
 
-        const result = await createUserWithExtensions({
-          userData: {
-            name: 'New User',
+        const result = await createEntityRecord({
+          entityData: {
+            baseFields: { name: 'New User' },
             email: 'user@example.com',
           },
-          extensionData: {
+          extensionFieldsData: {
             department: 'Engineering',
           },
         });
 
-        expect(mockService.createEntityWithExtensions).toHaveBeenCalledWith(
+        expect(mockService.createEntityRecord).toHaveBeenCalledWith(
           'test-tenant',
           'users',
-          { name: 'New User', email: 'user@example.com' },
+          { baseFields: { name: 'New User', email: 'user@example.com' }, extensions: {} },
           { department: 'Engineering' }
         );
 
@@ -376,21 +378,22 @@ describe('Content Management API', () => {
 
     describe('Content Management', () => {
       it('should list content with extensions', async () => {
-        mockService.listEntitiesWithExtensions.mockResolvedValue({
+        mockService.getEntityList.mockResolvedValue({
           data: [{ id: '1', title: 'Content 1', extensions: {} }],
           pagination: { page: 1, pageSize: 10, total: 1, totalPages: 1 },
         });
 
-        const { listContentWithExtensions } = await import('../api');
+        const { getEntityList } = await import('../../api');
 
-        const result = await listContentWithExtensions({
+        const result = await getEntityList({
+          entityTable: 'users',
           filters: '[]',
           sorters: '[]',
-          page: 1,
-          pageSize: 10,
+          limit: 10,
+          offset: 0,
         });
 
-        expect(mockService.listEntitiesWithExtensions).toHaveBeenCalledWith(
+        expect(mockService.getEntityList).toHaveBeenCalledWith(
           'test-tenant',
           'content',
           [],
@@ -412,7 +415,7 @@ describe('Content Management API', () => {
 
         mockExtensibleFields.getFieldDefinitionsCacheStats.mockReturnValue(mockStats);
 
-        const { getCacheStats } = await import('../api');
+        const { getCacheStats } = await import('../../api');
 
         const result = await getCacheStats();
 
@@ -426,7 +429,7 @@ describe('Content Management API', () => {
 
     describe('invalidateCache', () => {
       it('should invalidate cache for specific tenant and entity', async () => {
-        const { invalidateCache } = await import('../api');
+        const { invalidateCache } = await import('../../api');
 
         const result = await invalidateCache({
           tenantId: 'test-tenant',
@@ -445,7 +448,7 @@ describe('Content Management API', () => {
       });
 
       it('should invalidate cache for specific tenant', async () => {
-        const { invalidateCache } = await import('../api');
+        const { invalidateCache } = await import('../../api');
 
         const result = await invalidateCache({
           tenantId: 'test-tenant',
@@ -462,7 +465,7 @@ describe('Content Management API', () => {
       });
 
       it('should invalidate all cache', async () => {
-        const { invalidateCache } = await import('../api');
+        const { invalidateCache } = await import('../../api');
 
         const result = await invalidateCache({});
 
@@ -483,20 +486,20 @@ describe('Content Management API', () => {
         userInfo: { tenantId: 'specific-tenant' },
       });
 
-      mockService.listEntitiesWithExtensions.mockResolvedValue({
+      mockService.getEntityList.mockResolvedValue({
         data: [],
         pagination: { page: 1, pageSize: 10, total: 0, totalPages: 0 },
       });
 
-      const { listEntitiesWithExtensions } = await import('../api');
+      const { getEntityList } = await import('../api');
 
-      await listEntitiesWithExtensions({
+      await getEntityList({
         entityTable: 'users',
         filters: '[]',
         sorters: '[]',
       });
 
-      expect(mockService.listEntitiesWithExtensions).toHaveBeenCalledWith(
+      expect(mockService.getEntityList).toHaveBeenCalledWith(
         'specific-tenant', // Should use tenant from auth
         'users',
         [],
@@ -512,10 +515,10 @@ describe('Content Management API', () => {
         userInfo: {}, // No tenantId
       });
 
-      const { listEntitiesWithExtensions } = await import('../api');
+      const { getEntityList } = await import('../api');
 
       await expect(
-        listEntitiesWithExtensions({
+        getEntityList({
           entityTable: 'users',
           filters: '[]',
           sorters: '[]',
@@ -526,22 +529,22 @@ describe('Content Management API', () => {
 
   describe('Input Validation', () => {
     it('should validate required parameters', async () => {
-      const { createEntityWithExtensions } = await import('../api');
+      const { createEntityRecord } = await import('../api');
 
       await expect(
-        createEntityWithExtensions({
+        createEntityRecord({
           entityTable: '', // Empty entity table
           entityData: {},
-          extensionData: {},
+          extensionFieldsData: {},
         })
       ).rejects.toThrow();
     });
 
     it('should validate entity ID format', async () => {
-      const { getEntityWithExtensions } = await import('../api');
+      const { getEntityRecordData } = await import('../api');
 
       await expect(
-        getEntityWithExtensions({
+        getEntityRecordData({
           entityTable: 'users',
           entityId: '', // Empty entity ID
         })
@@ -549,15 +552,15 @@ describe('Content Management API', () => {
     });
 
     it('should validate pagination parameters', async () => {
-      mockService.listEntitiesWithExtensions.mockResolvedValue({
+      mockService.getEntityList.mockResolvedValue({
         data: [],
         pagination: { page: 1, pageSize: 10, total: 0, totalPages: 0 },
       });
 
-      const { listEntitiesWithExtensions } = await import('../api');
+      const { getEntityList } = await import('../api');
 
       // Should handle negative page numbers
-      await listEntitiesWithExtensions({
+      await getEntityList({
         entityTable: 'users',
         filters: '[]',
         sorters: '[]',
@@ -565,7 +568,7 @@ describe('Content Management API', () => {
         pageSize: 10,
       });
 
-      expect(mockService.listEntitiesWithExtensions).toHaveBeenCalledWith(
+      expect(mockService.getEntityList).toHaveBeenCalledWith(
         'test-tenant',
         'users',
         [],
@@ -576,15 +579,15 @@ describe('Content Management API', () => {
     });
 
     it('should validate pageSize limits', async () => {
-      mockService.listEntitiesWithExtensions.mockResolvedValue({
+      mockService.getEntityList.mockResolvedValue({
         data: [],
         pagination: { page: 1, pageSize: 100, total: 0, totalPages: 0 },
       });
 
-      const { listEntitiesWithExtensions } = await import('../api');
+      const { getEntityList } = await import('../api');
 
       // Should handle pageSize exceeding maximum
-      await listEntitiesWithExtensions({
+      await getEntityList({
         entityTable: 'users',
         filters: '[]',
         sorters: '[]',
@@ -592,7 +595,7 @@ describe('Content Management API', () => {
         pageSize: 1000, // Exceeds maximum
       });
 
-      expect(mockService.listEntitiesWithExtensions).toHaveBeenCalledWith(
+      expect(mockService.getEntityList).toHaveBeenCalledWith(
         'test-tenant',
         'users',
         [],
@@ -605,14 +608,14 @@ describe('Content Management API', () => {
 
   describe('Error Handling', () => {
     it('should handle service errors gracefully', async () => {
-      mockService.listEntitiesWithExtensions.mockRejectedValue(
+      mockService.getEntityList.mockRejectedValue(
         new Error('Database connection failed')
       );
 
-      const { listEntitiesWithExtensions } = await import('../api');
+      const { getEntityList } = await import('../api');
 
       await expect(
-        listEntitiesWithExtensions({
+        getEntityList({
           entityTable: 'users',
           filters: '[]',
           sorters: '[]',
@@ -621,10 +624,10 @@ describe('Content Management API', () => {
     });
 
     it('should handle JSON parsing errors', async () => {
-      const { listEntitiesWithExtensions } = await import('../api');
+      const { getEntityList } = await import('../api');
 
       await expect(
-        listEntitiesWithExtensions({
+        getEntityList({
           entityTable: 'users',
           filters: '{invalid json}',
           sorters: '[]',
@@ -633,17 +636,17 @@ describe('Content Management API', () => {
     });
 
     it('should provide meaningful error messages', async () => {
-      mockService.createEntityWithExtensions.mockRejectedValue(
+      mockService.createEntityRecord.mockRejectedValue(
         new Error('Validation failed: email is required')
       );
 
-      const { createEntityWithExtensions } = await import('../api');
+      const { createEntityRecord } = await import('../api');
 
       await expect(
-        createEntityWithExtensions({
+        createEntityRecord({
           entityTable: 'users',
           entityData: { name: 'Test' },
-          extensionData: {},
+          extensionFieldsData: {},
         })
       ).rejects.toThrow('Validation failed: email is required');
     });

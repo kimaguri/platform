@@ -5,7 +5,8 @@
 		"api-gateway": { "path": "./src/gateway" },
 		"tenant-management": { "path": "./src/services/tenant-management" },
 		"user-management": { "path": "./src/services/user-management" },
-		"data-processing": { "path": "./src/services/data-processing" }
+		"data-processing": { "path": "./src/services/data-processing" },
+		"event-management": { "path": "./src/services/event-management" }
 	},
 	"env": {
 		"NODE_ENV": { "required": false, "default": "development" },

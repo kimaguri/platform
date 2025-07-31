@@ -1,6 +1,10 @@
 import type { Adapter, AdapterFactory, AdapterConfig } from '../base';
 import { getConnectorType } from '../../lib/utils/connector-helper';
 import { getTenantConfigById } from '../../lib/utils/tenant-config';
+import {
+  getAdminSupabaseUrl,
+  getAdminSupabaseServiceKey,
+} from '../../services/tenant-management/service';
 import createSupabaseAdapter from '../supabase';
 import createPostgresAdapter from '../postgres';
 import createMongoAdapter from '../mongodb';
@@ -69,20 +73,29 @@ export function getAvailableConnectorTypes(): string[] {
 
 /**
  * Get admin adapter for tenant-management operations
- * Uses hardcoded admin DB credentials for consistency with current implementation
+ * Uses Encore secrets for admin DB credentials
  */
 export function getAdminAdapter(table: string): Adapter {
   const cacheKey = `admin:${table}`;
-  
+
   if (registryState.cache.has(cacheKey)) {
     return registryState.cache.get(cacheKey)!;
   }
 
-  // Use hardcoded admin DB config (will be replaced by service-level secrets)
+  // Use Encore secrets for admin DB config
+  const adminSupabaseUrl = getAdminSupabaseUrl() || 'https://zshakbdzhwxfxzyqtizl.supabase.co';
+  const adminSupabaseKey =
+    getAdminSupabaseServiceKey() ||
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpzaGFrYmR6aHd4Znh6eXF0aXpsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MzExMzk0OSwiZXhwIjoyMDY4Njg5OTQ5fQ.c67jAz_5TLnq7GY9hega04v1M7Jv0OiTrVfBlPBiEPI';
+
+  if (!adminSupabaseUrl || !adminSupabaseKey) {
+    throw new Error('Admin Supabase credentials are not configured properly');
+  }
+
   const adminConfig = {
     type: 'supabase' as const,
-    supabaseUrl: 'https://zshakbdzhwxfxzyqtizl.supabase.co',
-    supabaseKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpzaGFrYmR6aHd4Znh6eXF0aXpsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MzExMzk0OSwiZXhwIjoyMDY4Njg5OTQ5fQ.c67jAz_5TLnq7GY9hega04v1M7Jv0OiTrVfBlPBiEPI',
+    supabaseUrl: adminSupabaseUrl,
+    supabaseKey: adminSupabaseKey,
     table,
   };
 
@@ -99,9 +112,17 @@ export function getAdminAdapter(table: string): Adapter {
 /**
  * Get adapter for tenant - integrates with existing connector-type system
  */
-export async function getAdapterForTenant(tenantId: string, table: string, jwtToken?: string): Promise<Adapter> {
-  console.log('[ConnectorRegistry] getAdapterForTenant called with:', { tenantId, table, hasJwtToken: !!jwtToken });
-  
+export async function getAdapterForTenant(
+  tenantId: string,
+  table: string,
+  jwtToken?: string
+): Promise<Adapter> {
+  console.log('[ConnectorRegistry] getAdapterForTenant called with:', {
+    tenantId,
+    table,
+    hasJwtToken: !!jwtToken,
+  });
+
   const cacheKey = `${tenantId}:${table}`;
 
   // Check cache first - НЕ используем кеш для адаптеров с JWT токеном
