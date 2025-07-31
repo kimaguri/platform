@@ -40,6 +40,7 @@ function fromPayload(payload: Payload): Record<string, any> {
 let userManagementService: any;
 let tenantManagementService: any;
 let dataProcessingService: any;
+let eventManagementService: any;
 
 // Initialize clients asynchronously
 async function initializeClients() {
@@ -49,6 +50,7 @@ async function initializeClients() {
     userManagementService = clients.user_management;
     tenantManagementService = clients.tenant_management;
     dataProcessingService = clients.data_processing;
+    eventManagementService = clients.event_management;
   } catch (error) {
     console.warn('Encore clients not available yet, using fallback implementations');
   }
@@ -366,6 +368,121 @@ export const tenantManagementClient = {
     }
     throw new Error('Tenant management service not available');
   },
+
+  /**
+   * Get entity schema (standard + extensible fields)
+   */
+  getEntitySchema: async (params: { entityName: string }): Promise<any> => {
+    if (tenantManagementService?.getEntitySchema) {
+      return await tenantManagementService.getEntitySchema(params);
+    }
+    throw new Error('Tenant management service not available');
+  },
+
+  // ===== ENTITY CONVERSION RULES METHODS =====
+
+  /**
+   * Get conversion rules for tenant
+   */
+  getConversionRules: async (params: {
+    sourceEntity?: string;
+    isActive?: boolean;
+  }): Promise<any> => {
+    if (!tenantManagementService) {
+      throw new Error('Tenant Management service not available');
+    }
+    return tenantManagementService.getConversionRules(params);
+  },
+
+  /**
+   * Get conversion rule by ID
+   */
+  getConversionRule: async (params: { ruleId: string }): Promise<any> => {
+    if (!tenantManagementService) {
+      throw new Error('Tenant Management service not available');
+    }
+    return tenantManagementService.getConversionRule(params);
+  },
+
+  /**
+   * Create new conversion rule
+   */
+  createConversionRule: async (params: { ruleData: any }): Promise<any> => {
+    if (!tenantManagementService) {
+      throw new Error('Tenant Management service not available');
+    }
+    return tenantManagementService.createConversionRule(params);
+  },
+
+  /**
+   * Update conversion rule
+   */
+  updateConversionRule: async (params: {
+    ruleId: string;
+    ruleData: any;
+  }): Promise<any> => {
+    if (!tenantManagementService) {
+      throw new Error('Tenant Management service not available');
+    }
+    return tenantManagementService.updateConversionRule(params);
+  },
+
+  /**
+   * Delete conversion rule
+   */
+  deleteConversionRule: async (params: {
+    ruleId: string;
+    hardDelete?: boolean;
+  }): Promise<any> => {
+    if (!tenantManagementService) {
+      throw new Error('Tenant Management service not available');
+    }
+    return tenantManagementService.deleteConversionRule(params);
+  },
+
+  /**
+   * Get conversion rules statistics
+   */
+  getConversionRulesStats: async (): Promise<any> => {
+    if (!tenantManagementService) {
+      throw new Error('Tenant Management service not available');
+    }
+    return tenantManagementService.getConversionRulesStats();
+  },
+
+  /**
+   * Validate trigger conditions
+   */
+  validateTriggerConditions: async (params: {
+    conditions: any;
+    sourceEntity: string;
+  }): Promise<any> => {
+    if (!tenantManagementService) {
+      throw new Error('Tenant Management service not available');
+    }
+    return tenantManagementService.validateTriggerConditions(params);
+  },
+
+  /**
+   * Get mapping suggestions between source and target entities
+   * Generates smart field mapping suggestions based on schema analysis
+   */
+  getMappingSuggestions: async (
+    tenantId: string,
+    params: {
+      sourceEntity: string;
+      targetEntity: string;
+    }
+  ): Promise<any> => {
+    if (!tenantManagementService) {
+      throw new Error('Tenant Management service not available');
+    }
+    return tenantManagementService.generateMappingSuggestions({
+      tenantId,
+      sourceEntity: params.sourceEntity,
+      targetEntity: params.targetEntity,
+    });
+  },
 };
 
 /**
@@ -491,11 +608,258 @@ export const dataProcessingClient = {
     offset?: number;
     orderBy?: Array<{ field: string; direction: 'asc' | 'desc' }>;
   }) => {
-    if (dataProcessingService?.searchEntityRecords) {
-      return await dataProcessingService.searchEntityRecords(params);
+    if (!dataProcessingService) {
+      throw new Error('Data Processing service not available');
     }
-    throw new Error('Data processing service not available');
+    return dataProcessingService.searchEntityRecords({
+      entity: params.entity,
+      filter: JSON.stringify(params.filter || {}),
+      limit: params.limit,
+      offset: params.offset,
+      orderBy: JSON.stringify(params.orderBy || []),
+    });
   },
+
+  // ===== ENTITY CONVERSION METHODS =====
+
+  /**
+   * Execute entity conversion
+   */
+  executeConversion: async (params: {
+    ruleId: string;
+    sourceRecordId: string;
+  }): Promise<any> => {
+    if (!dataProcessingService) {
+      throw new Error('Data Processing service not available');
+    }
+    return dataProcessingService.executeConversion(params);
+  },
+
+  /**
+   * Get available conversion rules for entity
+   */
+  getAvailableRules: async (params: { sourceEntity: string }): Promise<any> => {
+    if (!dataProcessingService) {
+      throw new Error('Data Processing service not available');
+    }
+    return dataProcessingService.getAvailableRules(params);
+  },
+
+  /**
+   * Check auto triggers for record
+   */
+  checkAutoTriggersForRecord: async (params: {
+    entityTable: string;
+    recordId: string;
+  }): Promise<any> => {
+    if (!dataProcessingService) {
+      throw new Error('Data Processing service not available');
+    }
+    return dataProcessingService.checkAutoTriggersForRecord(params);
+  },
+
+  /**
+   * Validate trigger conditions
+   */
+  validateConditions: async (params: {
+    conditions: any;
+    record: Record<string, any>;
+    extensionFields?: Record<string, any>;
+  }): Promise<any> => {
+    if (!dataProcessingService) {
+      throw new Error('Data Processing service not available');
+    }
+    return dataProcessingService.validateConditions(params);
+  },
+};
+
+/**
+ * Event Management Service Client
+ * Wraps the RPC calls with proper error handling
+ */
+export const eventManagementClient = {
+  // ===== EVENT PUBLISHING METHODS =====
+
+  /**
+   * Publish conversion event
+   */
+  async publishConversionEvent(params: {
+    eventType: string;
+    eventData: Record<string, any>;
+  }): Promise<any> {
+    try {
+      if (!eventManagementService) {
+        throw new Error('Event Management service not available');
+      }
+      return await eventManagementService.publishConversionEvent(params);
+    } catch (error) {
+      console.error('Error publishing conversion event:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get event statistics
+   */
+  async getEventStats(params?: {
+    tenantId?: string;
+    eventType?: string;
+    dateFrom?: string;
+    dateTo?: string;
+  }): Promise<any> {
+    try {
+      if (!eventManagementService) {
+        throw new Error('Event Management service not available');
+      }
+      return await eventManagementService.getEventStats(params || {});
+    } catch (error) {
+      console.error('Error getting event stats:', error);
+      throw error;
+    }
+  },
+
+  // ===== AUDIT METHODS =====
+
+  /**
+   * Get audit trail for conversion activities
+   */
+  async getAuditTrail(params: {
+    tenantId?: string;
+    entityType?: string;
+    entityId?: string;
+    eventType?: string;
+    userId?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<any> {
+    try {
+      if (!eventManagementService) {
+        throw new Error('Event Management service not available');
+      }
+      return await eventManagementService.getAuditTrail(params);
+    } catch (error) {
+      console.error('Error getting audit trail:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get audit statistics
+   */
+  async getAuditStats(params?: {
+    tenantId?: string;
+    dateFrom?: string;
+    dateTo?: string;
+  }): Promise<any> {
+    try {
+      if (!eventManagementService) {
+        throw new Error('Event Management service not available');
+      }
+      return await eventManagementService.getAuditStats(params || {});
+    } catch (error) {
+      console.error('Error getting audit stats:', error);
+      throw error;
+    }
+  },
+
+  // ===== NOTIFICATION METHODS =====
+
+  /**
+   * Send conversion notification
+   */
+  async sendConversionNotification(params: {
+    eventType: string;
+    event: Record<string, any>;
+    recipients: Array<{ type: string; target: string }>;
+    priority: string;
+    template?: string;
+    customData?: Record<string, any>;
+  }): Promise<any> {
+    try {
+      if (!eventManagementService) {
+        throw new Error('Event Management service not available');
+      }
+      return await eventManagementService.sendConversionNotification(params);
+    } catch (error) {
+      console.error('Error sending conversion notification:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get notification settings for tenant
+   */
+  async getNotificationSettings(params: { tenantId: string }): Promise<any> {
+    try {
+      if (!eventManagementService) {
+        throw new Error('Event Management service not available');
+      }
+      return await eventManagementService.getNotificationSettings(params);
+    } catch (error) {
+      console.error('Error getting notification settings:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Update notification settings for tenant
+   */
+  async updateNotificationSettings(params: {
+    tenantId: string;
+    emailEnabled: boolean;
+    inAppEnabled: boolean;
+    webhookEnabled: boolean;
+    recipients: Array<{ type: string; target: string }>;
+    templates: Array<Record<string, any>>;
+  }): Promise<any> {
+    try {
+      if (!eventManagementService) {
+        throw new Error('Event Management service not available');
+      }
+      return await eventManagementService.updateNotificationSettings(params);
+    } catch (error) {
+      console.error('Error updating notification settings:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get notification history
+   */
+  async getNotificationHistory(params: {
+    tenantId: string;
+    eventType?: string;
+    status?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<any> {
+    try {
+      if (!eventManagementService) {
+        throw new Error('Event Management service not available');
+      }
+      return await eventManagementService.getNotificationHistory(params);
+    } catch (error) {
+      console.error('Error getting notification history:', error);
+      throw error;
+    }
+  },
+
+  // ===== HEALTH CHECK =====
+
+  /**
+   * Health check for event management system
+   */
+  async healthCheck(): Promise<any> {
+    try {
+      if (!eventManagementService) {
+        throw new Error('Event Management service not available');
+      }
+      return await eventManagementService.healthCheck();
+    } catch (error) {
+      console.error('Error in event management health check:', error);
+      throw error;
+    }
+  }
 };
 
 /**

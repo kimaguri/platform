@@ -2,6 +2,16 @@ import { getActiveTenants, checkAdminConnection } from './admin-operations';
 import { createClient } from '@supabase/supabase-js';
 import { getAdminSupabaseUrl, getAdminSupabaseServiceKey } from '../service';
 
+// Тип для описания поля сущности, который будет возвращаться на фронтенд
+export interface EntityFieldDefinition {
+  label: string;
+  value: string;
+  type: 'text' | 'number' | 'boolean' | 'date' | 'json' | 'select' | 'multiselect' | 'textarea' | 'email' | 'phone' | 'url';
+  category: 'basic' | 'contact' | 'financial' | 'system' | 'custom';
+  isSystemField: boolean; // true для стандартных, false для расширяемых
+}
+
+
 /**
  * Extensible Fields Management в Tenant Management Service
  * Все операции с метаданными полей в админской БД
@@ -93,6 +103,79 @@ export type SupportedEntity = (typeof SUPPORTED_ENTITIES)[number];
 export function isSupportedEntity(entityTable: string): entityTable is SupportedEntity {
   return SUPPORTED_ENTITIES.includes(entityTable as SupportedEntity);
 }
+
+// Определение стандартных (базовых) полей для каждой сущности
+const STANDARD_ENTITY_FIELDS: Record<SupportedEntity, EntityFieldDefinition[]> = {
+  lead: [
+    { label: 'Название лида', value: 'name', type: 'text', category: 'basic', isSystemField: true },
+    { label: 'Источник', value: 'source', type: 'text', category: 'basic', isSystemField: true },
+    { label: 'Статус', value: 'status', type: 'select', category: 'basic', isSystemField: true },
+    { label: 'Ответственный', value: 'assignee_id', type: 'text', category: 'system', isSystemField: true },
+    { label: 'Компания', value: 'company_name', type: 'text', category: 'basic', isSystemField: true },
+    { label: 'Email', value: 'email', type: 'email', category: 'contact', isSystemField: true },
+    { label: 'Телефон', value: 'phone', type: 'phone', category: 'contact', isSystemField: true },
+    { label: 'Бюджет', value: 'budget', type: 'number', category: 'financial', isSystemField: true },
+  ],
+  clients: [
+    { label: 'Имя клиента', value: 'name', type: 'text', category: 'basic', isSystemField: true },
+    { label: 'Тип клиента', value: 'type', type: 'select', category: 'basic', isSystemField: true },
+    { label: 'Email', value: 'email', type: 'email', category: 'contact', isSystemField: true },
+    { label: 'Телефон', value: 'phone', type: 'phone', category: 'contact', isSystemField: true },
+    { label: 'Адрес', value: 'address', type: 'textarea', category: 'contact', isSystemField: true },
+  ],
+  projects: [
+    { label: 'Название проекта', value: 'name', type: 'text', category: 'basic', isSystemField: true },
+    { label: 'Статус', value: 'status', type: 'select', category: 'basic', isSystemField: true },
+    { label: 'Клиент', value: 'client_id', type: 'text', category: 'system', isSystemField: true },
+    { label: 'Дата начала', value: 'start_date', type: 'date', category: 'basic', isSystemField: true },
+    { label: 'Дата окончания', value: 'end_date', type: 'date', category: 'basic', isSystemField: true },
+  ],
+  activities: [
+    { label: 'Тип активности', value: 'type', type: 'select', category: 'basic', isSystemField: true },
+    { label: 'Описание', value: 'description', type: 'textarea', category: 'basic', isSystemField: true },
+    { label: 'Дата', value: 'activity_date', type: 'date', category: 'basic', isSystemField: true },
+    { label: 'Связано с', value: 'related_to_id', type: 'text', category: 'system', isSystemField: true },
+  ],
+  employee: [
+    { label: 'Имя', value: 'first_name', type: 'text', category: 'basic', isSystemField: true },
+    { label: 'Фамилия', value: 'last_name', type: 'text', category: 'basic', isSystemField: true },
+    { label: 'Должность', value: 'position', type: 'text', category: 'basic', isSystemField: true },
+    { label: 'Email', value: 'email', type: 'email', category: 'contact', isSystemField: true },
+    { label: 'Телефон', value: 'phone', type: 'phone', category: 'contact', isSystemField: true },
+  ],
+};
+
+/**
+ * Получение полной схемы сущности (стандартные + расширяемые поля)
+ */
+export async function getEntitySchema(
+  tenantId: string,
+  entityTable: string
+): Promise<EntityFieldDefinition[]> {
+  // 1. Проверяем, поддерживается ли сущность
+  if (!isSupportedEntity(entityTable)) {
+    throw new Error(`Entity '${entityTable}' is not supported for schema retrieval.`);
+  }
+
+  // 2. Получаем стандартные поля для этой сущности
+  const standardFields = STANDARD_ENTITY_FIELDS[entityTable];
+
+  // 3. Получаем расширяемые поля для этой сущности
+  const extensionFields = await getFieldDefinitionsForTenant(tenantId, entityTable);
+
+  // 4. Трансформируем расширяемые поля в формат EntityFieldDefinition
+  const customFields: EntityFieldDefinition[] = extensionFields.map(field => ({
+    label: field.display_name,
+    value: field.field_name,
+    type: field.field_type,
+    category: 'custom',
+    isSystemField: false,
+  }));
+
+  // 5. Объединяем и возвращаем
+  return [...standardFields, ...customFields];
+}
+
 
 /**
  * Получение определений полей для тенанта и сущности из админской БД

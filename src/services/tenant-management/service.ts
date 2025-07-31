@@ -34,12 +34,15 @@ import {
   getAllExtensionFields,
 } from './src/admin-operations';
 
-import type { ExtensionFieldDefinition } from './src/models/extensionField';
+import type { ExtensionFieldDefinition as ExtensionFieldDefinitionInternal } from './src/models/extensionField';
+import type { EntityFieldDefinition } from './src/extensible-fields'; // Импортируем новый тип
+export type { EntityFieldDefinition } from './src/extensible-fields'; // Импортируем и экспортируем новый тип
 import {
   SUPPORTED_ENTITIES,
   getFieldDefinitionsForTenant as getExtensionFieldsForTenant,
   getAllFieldDefinitionsForTenant as getAllExtensionFieldsForTenant,
-  createFieldDefinition as createExtensionFieldDefinition,
+  createFieldDefinition as createExtensionFieldDefinitionInternal,
+  getEntitySchema as getEntitySchemaFromModule, // Импортируем новую функцию
 } from './src/extensible-fields';
 
 /**
@@ -240,35 +243,44 @@ export async function createSupabaseConfig(
  */
 export async function getTenantConfiguration(tenantId: string): Promise<ApiResponse<TenantConfig>> {
   try {
-    // For now, get full tenant info which includes config
-    const tenantInfo = await getTenantFullInfo(tenantId);
+    const config = await getAdminTenantConfigById(tenantId);
 
-    if (!tenantInfo || !tenantInfo.supabase_url) {
+    if (!config) {
       return {
-        error: 'Tenant configuration not found',
-        message: 'Tenant configuration not found',
+        error: `Configuration for tenant ${tenantId} not found`,
+        message: 'Configuration not found',
       };
     }
 
-    // Convert to TenantConfig format
-    const config: TenantConfig = {
-      id: tenantInfo.id,
-      tenant_id: tenantInfo.tenant_id,
-      supabase_url: tenantInfo.supabase_url,
-      supabase_anon_key: '', // Not available in TenantFullInfo
-      supabase_service_key: '', // Not available in TenantFullInfo
-      created_at: tenantInfo.created_at,
-      updated_at: tenantInfo.updated_at,
-    };
-
     return {
       data: config,
-      message: 'Tenant configuration retrieved successfully',
+      message: `Retrieved configuration for tenant ${tenantId}`,
     };
   } catch (error) {
     return {
-      error: error instanceof Error ? error.message : 'Failed to fetch tenant configuration',
-      message: 'Failed to fetch tenant configuration',
+      error: error instanceof Error ? error.message : 'Failed to fetch configuration',
+      message: 'Failed to fetch configuration',
+    };
+  }
+}
+
+/**
+ * Get entity schema (standard + custom fields)
+ */
+export async function getEntitySchema(params: {
+  tenantId: string;
+  entityName: string;
+}): Promise<ApiResponse<EntityFieldDefinition[]>> {
+  try {
+    const schema = await getEntitySchemaFromModule(params.tenantId, params.entityName);
+    return {
+      data: schema,
+      message: `Schema retrieved for entity ${params.entityName}`,
+    };
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : 'Failed to fetch entity schema',
+      message: 'Failed to fetch entity schema',
     };
   }
 }
@@ -281,39 +293,28 @@ export async function getTenantConfiguration(tenantId: string): Promise<ApiRespo
 export async function getFieldDefinitionsForTenant(
   tenantId: string,
   entityTable?: string
-): Promise<ApiResponse<ExtensionFieldDefinition[]>> {
+): Promise<ApiResponse<ExtensionFieldDefinitionInternal[]>> {
   try {
-    console.log('[TenantService] getFieldDefinitionsForTenant called:', { tenantId, entityTable });
+    let definitions: ExtensionFieldDefinitionInternal[];
 
-    // Если entityTable не указан, получаем все поля для тенанта
-    if (!entityTable) {
-      console.log('[TenantService] No entityTable provided, getting all fields for tenant');
-      const allDefinitions = await getAllExtensionFieldsForTenant(tenantId);
-
-      // Преобразуем Record<string, ExtensionFieldDefinition[]> в плоский массив
-      const flatDefinitions: ExtensionFieldDefinition[] = [];
-      Object.values(allDefinitions).forEach((entityFields) => {
-        flatDefinitions.push(...entityFields);
-      });
-
-      return {
-        data: flatDefinitions,
-        message: `Retrieved ${flatDefinitions.length} field definitions for tenant ${tenantId} (all entities)`,
-      };
+    if (entityTable) {
+      // Если указана конкретная сущность, получаем поля только для нее.
+      definitions = await getExtensionFieldsForTenant(tenantId, entityTable);
+    } else {
+      // Если сущность не указана, получаем поля для всех сущностей и объединяем в один массив.
+      const allDefinitionsMap = await getAllExtensionFieldsForTenant(tenantId);
+      definitions = Object.values(allDefinitionsMap).flat();
     }
-
-    const definitions = await getExtensionFieldsForTenant(tenantId, entityTable);
-    console.log('[TenantService] Got definitions:', definitions.length, 'items');
 
     return {
       data: definitions,
-      message: `Retrieved ${definitions.length} field definitions for ${tenantId}:${entityTable}`,
+      message: `Retrieved ${definitions.length} field definitions for tenant ${tenantId}`,
     };
   } catch (error) {
-    console.error('[TenantService] Error in getFieldDefinitionsForTenant:', error);
+    const errorMessage = `Failed to get field definitions for tenant ${tenantId}`;
     return {
-      error: error instanceof Error ? error.message : 'Failed to fetch field definitions',
-      message: 'Failed to fetch field definitions',
+      error: error instanceof Error ? error.message : errorMessage,
+      message: errorMessage,
     };
   }
 }
@@ -323,22 +324,17 @@ export async function getFieldDefinitionsForTenant(
  */
 export async function getAllFieldDefinitionsForTenant(
   tenantId: string
-): Promise<ApiResponse<Record<string, ExtensionFieldDefinition[]>>> {
+): Promise<ApiResponse<Record<string, ExtensionFieldDefinitionInternal[]>>> {
   try {
     const definitions = await getAllExtensionFieldsForTenant(tenantId);
-
-    const totalFields = Object.values(definitions).reduce((sum, fields) => sum + fields.length, 0);
-
     return {
       data: definitions,
-      message: `Retrieved ${totalFields} field definitions across ${
-        Object.keys(definitions).length
-      } entities for tenant ${tenantId}`,
+      message: `Retrieved all field definitions for tenant ${tenantId}`,
     };
   } catch (error) {
     return {
-      error: error instanceof Error ? error.message : 'Failed to fetch field definitions',
-      message: 'Failed to fetch field definitions',
+      error: 'Failed to get all field definitions',
+      message: `Failed to get all field definitions for tenant ${tenantId}`,
     };
   }
 }
@@ -348,46 +344,24 @@ export async function getAllFieldDefinitionsForTenant(
  */
 export async function createFieldDefinition(
   tenantId: string,
-  fieldDefinition: Omit<ExtensionFieldDefinition, 'id' | 'tenant_id' | 'created_at' | 'updated_at'>
-): Promise<ApiResponse<ExtensionFieldDefinition>> {
-  console.log('[TenantService] createFieldDefinition called with:', {
-    tenantId,
-    fieldDefinition: {
-      entity_table: fieldDefinition.entity_table,
-      field_name: fieldDefinition.field_name,
-      field_type: fieldDefinition.field_type,
-      display_name: fieldDefinition.display_name,
-      is_required: fieldDefinition.is_required,
-      is_active: fieldDefinition.is_active,
-    },
-  });
-
+  fieldDefinition: Omit<ExtensionFieldDefinitionInternal, 'id' | 'tenant_id' | 'created_at' | 'updated_at'>
+): Promise<ApiResponse<ExtensionFieldDefinitionInternal>> {
   try {
-    const now = new Date().toISOString();
-    console.log('[TenantService] Calling createAdminExtensionField...');
+    if (!SUPPORTED_ENTITIES.includes(fieldDefinition.entity_table as any)) {
+      return {
+        error: `Entity table '${fieldDefinition.entity_table}' is not supported.`,
+        message: 'Unsupported entity table',
+      };
+    }
 
-    const definition = await createExtensionFieldDefinition(tenantId, fieldDefinition);
-
-    console.log('[TenantService] createAdminExtensionField success:', {
-      id: definition.id,
-      field_name: definition.field_name,
-      display_name: definition.display_name,
-    });
-
+    const newField = await createExtensionFieldDefinitionInternal(tenantId, fieldDefinition);
     return {
-      data: definition,
-      message: `Created field definition '${definition.display_name}' for ${tenantId}:${definition.entity_table}`,
+      data: newField,
+      message: 'Field definition created successfully',
     };
   } catch (error) {
-    console.error('[TenantService] createFieldDefinition error:', {
-      error: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined,
-      tenantId,
-      fieldDefinition,
-    });
-
     return {
-      error: error instanceof Error ? error.message : 'Failed to create field definition',
+      error: 'Failed to create field definition',
       message: 'Failed to create field definition',
     };
   }
@@ -399,13 +373,13 @@ export async function createFieldDefinition(
 export async function updateFieldDefinition(
   tenantId: string,
   fieldId: number,
-  updates: Partial<Omit<ExtensionFieldDefinition, 'id' | 'tenant_id' | 'created_at' | 'updated_at'>>
-): Promise<ApiResponse<ExtensionFieldDefinition>> {
+  updates: Partial<Omit<ExtensionFieldDefinitionInternal, 'id' | 'tenant_id' | 'created_at' | 'updated_at'>>
+): Promise<ApiResponse<ExtensionFieldDefinitionInternal>> {
   try {
     // First, get the existing field to verify tenant ownership
     const existingFieldsRecord = await getAllExtensionFieldsForTenant(tenantId);
     const allFields = Object.values(existingFieldsRecord).flat();
-    const existingField = allFields.find((field: ExtensionFieldDefinition) => field.id === fieldId);
+    const existingField = allFields.find((field: ExtensionFieldDefinitionInternal) => field.id === fieldId);
 
     if (!existingField) {
       throw new Error('Field definition not found or access denied');
@@ -439,7 +413,7 @@ export async function deleteFieldDefinition(
     // First, get the existing field to verify tenant ownership
     const existingFieldsRecord = await getAllExtensionFieldsForTenant(tenantId);
     const allFields = Object.values(existingFieldsRecord).flat();
-    const existingField = allFields.find((field: ExtensionFieldDefinition) => field.id === fieldId);
+    const existingField = allFields.find((field: ExtensionFieldDefinitionInternal) => field.id === fieldId);
 
     if (!existingField) {
       throw new Error('Field definition not found or access denied');
@@ -706,6 +680,8 @@ export async function getAvailableTables(tenantId: string): Promise<ApiResponse<
     };
   }
 }
+
+
 
 // ===== SECRET HELPER FUNCTIONS =====
 // These functions provide access to Encore secrets from within the service

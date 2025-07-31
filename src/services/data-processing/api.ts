@@ -12,6 +12,17 @@ import type {
   ExtensionFieldValue,
 } from './src/utils/extensible-fields';
 
+// Import types and functions for entity conversion
+import type {
+  ConversionExecutionResult,
+} from './src/utils/entity-conversion';
+import {
+  executeEntityConversion,
+  getAvailableConversionRules,
+  checkAutoTriggers,
+  checkTriggerConditions,
+} from './src/utils/entity-conversion';
+
 // ===== ENCORE-COMPATIBLE TYPES =====
 
 /**
@@ -369,8 +380,105 @@ export const getCacheStats = api(
   }
 );
 
+// ==========================================
+// Entity Conversion API Endpoints
+// ==========================================
+
 /**
- * Инвалидация кеша расширяемых полей
+ * Execute entity conversion
+ */
+export const executeConversion = api(
+  { auth: true, method: 'POST', path: '/entity-conversion/execute' },
+  async ({
+    ruleId,
+    sourceRecordId,
+  }: {
+    ruleId: string;
+    sourceRecordId: string;
+  }): Promise<ApiResponse<ConversionExecutionResult>> => {
+    const authData = getAuthData() as AuthData;
+    const result = await executeEntityConversion(
+      authData.tenantId,
+      ruleId,
+      sourceRecordId,
+      authData.jwtToken
+    );
+    return {
+      data: result,
+      message: result.success ? 'Конвертация выполнена успешно' : 'Ошибка при выполнении конвертации',
+    };
+  }
+);
+
+/**
+ * Get available conversion rules for entity
+ */
+export const getAvailableRules = api(
+  { auth: true, method: 'GET', path: '/entity-conversion/available/:sourceEntity' },
+  async ({ sourceEntity }: { sourceEntity: string }): Promise<ApiResponse<any[]>> => {
+    const authData = getAuthData() as AuthData;
+    const rules = await getAvailableConversionRules(authData.tenantId, sourceEntity);
+    return {
+      data: rules,
+      message: 'Доступные правила конвертации получены успешно',
+    };
+  }
+);
+
+/**
+ * Check auto triggers for record
+ */
+export const checkAutoTriggersForRecord = api(
+  { auth: true, method: 'POST', path: '/entity-conversion/check-triggers' },
+  async ({
+    entityTable,
+    recordId,
+  }: {
+    entityTable: string;
+    recordId: string;
+  }): Promise<ApiResponse<ConversionExecutionResult[]>> => {
+    const authData = getAuthData() as AuthData;
+    const results = await checkAutoTriggers(
+      authData.tenantId,
+      entityTable,
+      recordId,
+      authData.jwtToken
+    );
+    return {
+      data: results,
+      message: `Проверено автоматических триггеров: ${results.length}`,
+    };
+  }
+);
+
+/**
+ * Validate trigger conditions
+ */
+export const validateConditions = api(
+  { auth: true, method: 'POST', path: '/entity-conversion/validate-conditions' },
+  async ({
+    conditions,
+    record,
+    extensionFields,
+  }: {
+    conditions: any;
+    record: Record<string, any>;
+    extensionFields?: Record<string, any>;
+  }): Promise<ApiResponse<boolean>> => {
+    const result = checkTriggerConditions(
+      conditions,
+      record,
+      extensionFields || {}
+    );
+    return {
+      data: result,
+      message: result ? 'Условия выполнены' : 'Условия не выполнены',
+    };
+  }
+);
+
+/**
+ * Invalidate cache for extensible fields
  */
 export const invalidateCache = api(
   { auth: true, method: 'POST', path: '/entity/cache/invalidate' },

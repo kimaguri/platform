@@ -192,7 +192,7 @@ export const listUsers = api(
     const authData = getAuthData() as AuthData;
 
     // Check if user has admin permissions
-    if (!authData.permissions?.includes('users:read') && authData.role !== 'admin') {
+    if (authData.userRole !== 'admin' && authData.userRole !== 'super_admin') {
       throw new Error('Insufficient permissions to list users');
     }
 

@@ -83,7 +83,7 @@ const CACHE_TTL = 5 * 60 * 1000; // 5 минут для метаданных о�
  * Получение метаданных полей от Tenant Management Service
  * Используется кеширование для оптимизации
  */
-async function getFieldDefinitionsFromTenantService(
+export async function getFieldDefinitionsFromTenantService(
   tenantId: string,
   entityTable: string
 ): Promise<ExtensionFieldDefinition[]> {

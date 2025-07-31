@@ -120,7 +120,7 @@ export const logout = api(
       // Use AuthConnector for centralized logout logic
       await authLogout({
         tenantId: data.tenantId,
-        token: data.token,
+        token: data.token || '',
       });
 
       return {

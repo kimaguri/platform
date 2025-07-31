@@ -416,6 +416,42 @@ export const deleteFieldDefinition = api(
 );
 
 /**
+ * Get entity schema (standard + extensible fields)
+ */
+export const getEntitySchema = api(
+  { method: 'GET', path: '/api/v1/tenants/entities/:entityTable/schema', expose: true, auth: true },
+  async ({
+    entityTable,
+  }: {
+    entityTable: string;
+  }): Promise<ApiResponse<any[]>> => {
+    const authData = getAuthData() as AuthData;
+
+    // Any authenticated user can access the schema for building UI
+    if (!authData.tenantId) {
+        throw new Error('User not authenticated or tenant not found.');
+    }
+
+    try {
+      console.log(`[Gateway] Calling tenantManagementClient.getEntitySchema for entity: ${entityTable}`);
+      
+      const result = await tenantManagementClient.getEntitySchema({
+        entityName: entityTable,
+      });
+
+      // The service already returns data in ApiResponse format
+      return result;
+    } catch (error) {
+      throw new Error(
+        `Failed to get entity schema for ${entityTable}: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`
+      );
+    }
+  }
+);
+
+/**
  * Get extensible fields statistics
  */
 export const getExtensibleFieldsStats = api(
