@@ -9,4 +9,10 @@ node_modules
 .secrets.*.cue
 *.secrets.cue
 
+# Environment files with secrets - NEVER commit these files
+.env
+.env.local
+.env.*.local
+
+# Build outputs
 dist

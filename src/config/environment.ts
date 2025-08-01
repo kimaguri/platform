@@ -54,11 +54,6 @@ export const environmentConfig: EnvironmentConfig = {
   },
 };
 
-// Убираем Encore secrets, используем обычные переменные окружения
-// const adminSupabaseUrl = secret('ADMIN_SUPABASE_URL');
-// const adminSupabaseServiceKey = secret('ADMIN_SUPABASE_SERVICE_KEY');
-// const tenantConfigSecret = secret('TENANT_CONFIG');
-
 /**
  * Get environment variable with type conversion and validation
  */
@@ -110,22 +105,6 @@ export function getEnvVar<T = string>(
         error instanceof Error ? error.message : 'Unknown error'
       }`
     );
-  }
-}
-
-/**
- * Get environment variable value (previously secret)
- */
-export function getSecret(key: string): string {
-  switch (key) {
-    case 'ADMIN_SUPABASE_URL':
-      return process.env[key] || '';
-    case 'ADMIN_SUPABASE_SERVICE_KEY':
-      return process.env[key] || '';
-    case 'TENANT_CONFIG':
-      return process.env[key] || '';
-    default:
-      throw new Error(`Unknown environment variable: ${key}`);
   }
 }
 
@@ -221,23 +200,5 @@ export function validateEnvironment(): { valid: boolean; errors: string[]; warni
     valid: errors.length === 0,
     errors,
     warnings,
-  };
-}
-
-/**
- * Load environment configuration with defaults
- */
-export function loadEnvironmentDefaults(): Record<string, any> {
-  const env = getEnvVar('NODE_ENV', 'development') as string;
-
-  return {
-    NODE_ENV: env,
-    PORT: getEnvVar('PORT', 4000, 'number'),
-    HOST: getEnvVar('HOST', '0.0.0.0'),
-    LOG_LEVEL: getEnvVar('LOG_LEVEL', env === 'production' ? 'info' : 'debug'),
-    ENABLE_METRICS: getEnvVar('ENABLE_METRICS', true, 'boolean'),
-    ENABLE_CACHING: getEnvVar('ENABLE_CACHING', true, 'boolean'),
-    RATE_LIMIT_REQUESTS: getEnvVar('RATE_LIMIT_REQUESTS', 100, 'number'),
-    RATE_LIMIT_WINDOW: getEnvVar('RATE_LIMIT_WINDOW', 60000, 'number'),
   };
 }

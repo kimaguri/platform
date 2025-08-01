@@ -1,4 +1,4 @@
-import { secret } from 'encore.dev/config';
+import { secret } from 'encore.dev/config'; // Используем Encore secrets
 import type { ApiResponse } from '../../lib/types';
 import type {
   Tenant,
@@ -10,8 +10,8 @@ import type {
 } from './src/models/tenant';
 
 // Encore secrets for admin database
-const adminSupabaseUrl = secret('AdminSupabaseUrl');
-const adminSupabaseServiceKey = secret('AdminSupabaseServiceKey');
+const AdminSupabaseUrl = secret('ADMIN_SUPABASE_URL');
+const AdminSupabaseServiceKey = secret('ADMIN_SUPABASE_SERVICE_KEY');
 
 // Import admin operations - functional approach following other services
 import {
@@ -344,7 +344,10 @@ export async function getAllFieldDefinitionsForTenant(
  */
 export async function createFieldDefinition(
   tenantId: string,
-  fieldDefinition: Omit<ExtensionFieldDefinitionInternal, 'id' | 'tenant_id' | 'created_at' | 'updated_at'>
+  fieldDefinition: Omit<
+    ExtensionFieldDefinitionInternal,
+    'id' | 'tenant_id' | 'created_at' | 'updated_at'
+  >
 ): Promise<ApiResponse<ExtensionFieldDefinitionInternal>> {
   try {
     if (!SUPPORTED_ENTITIES.includes(fieldDefinition.entity_table as any)) {
@@ -373,13 +376,17 @@ export async function createFieldDefinition(
 export async function updateFieldDefinition(
   tenantId: string,
   fieldId: number,
-  updates: Partial<Omit<ExtensionFieldDefinitionInternal, 'id' | 'tenant_id' | 'created_at' | 'updated_at'>>
+  updates: Partial<
+    Omit<ExtensionFieldDefinitionInternal, 'id' | 'tenant_id' | 'created_at' | 'updated_at'>
+  >
 ): Promise<ApiResponse<ExtensionFieldDefinitionInternal>> {
   try {
     // First, get the existing field to verify tenant ownership
     const existingFieldsRecord = await getAllExtensionFieldsForTenant(tenantId);
     const allFields = Object.values(existingFieldsRecord).flat();
-    const existingField = allFields.find((field: ExtensionFieldDefinitionInternal) => field.id === fieldId);
+    const existingField = allFields.find(
+      (field: ExtensionFieldDefinitionInternal) => field.id === fieldId
+    );
 
     if (!existingField) {
       throw new Error('Field definition not found or access denied');
@@ -413,7 +420,9 @@ export async function deleteFieldDefinition(
     // First, get the existing field to verify tenant ownership
     const existingFieldsRecord = await getAllExtensionFieldsForTenant(tenantId);
     const allFields = Object.values(existingFieldsRecord).flat();
-    const existingField = allFields.find((field: ExtensionFieldDefinitionInternal) => field.id === fieldId);
+    const existingField = allFields.find(
+      (field: ExtensionFieldDefinitionInternal) => field.id === fieldId
+    );
 
     if (!existingField) {
       throw new Error('Field definition not found or access denied');
@@ -681,21 +690,19 @@ export async function getAvailableTables(tenantId: string): Promise<ApiResponse<
   }
 }
 
-
-
 // ===== SECRET HELPER FUNCTIONS =====
 // These functions provide access to Encore secrets from within the service
 
 /**
  * Get admin Supabase URL from Encore secrets
  */
-export function getAdminSupabaseUrl(): string {
-  return adminSupabaseUrl();
+export function getAdminSupabaseUrl() {
+  return AdminSupabaseUrl();
 }
 
 /**
  * Get admin Supabase service key from Encore secrets
  */
-export function getAdminSupabaseServiceKey(): string {
-  return adminSupabaseServiceKey();
+export function getAdminSupabaseServiceKey() {
+  return AdminSupabaseServiceKey();
 }

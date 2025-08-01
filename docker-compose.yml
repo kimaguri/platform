@@ -19,6 +19,12 @@ services:
       - USER_MANAGEMENT_PORT=4002
       - DATA_PROCESSING_PORT=4003
       - EVENT_MANAGEMENT_PORT=4004
+      # Supabase Admin Credentials (should be provided via env file in production)
+      - ADMIN_SUPABASE_URL=${ADMIN_SUPABASE_URL}
+      - ADMIN_SUPABASE_SERVICE_KEY=${ADMIN_SUPABASE_SERVICE_KEY}
+      # Security secrets
+      - JWT_SECRET=${JWT_SECRET}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
     networks:
       - simplx-network
 
@@ -30,6 +36,12 @@ services:
     environment:
       - NODE_ENV=production
       - SERVICE_PORT=4001
+      # Supabase Admin Credentials
+      - ADMIN_SUPABASE_URL=${ADMIN_SUPABASE_URL}
+      - ADMIN_SUPABASE_SERVICE_KEY=${ADMIN_SUPABASE_SERVICE_KEY}
+      # Security secrets
+      - JWT_SECRET=${JWT_SECRET}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
     expose:
       - "4001"
     networks:
@@ -43,6 +55,12 @@ services:
     environment:
       - NODE_ENV=production
       - SERVICE_PORT=4002
+      # Supabase Admin Credentials
+      - ADMIN_SUPABASE_URL=${ADMIN_SUPABASE_URL}
+      - ADMIN_SUPABASE_SERVICE_KEY=${ADMIN_SUPABASE_SERVICE_KEY}
+      # Security secrets
+      - JWT_SECRET=${JWT_SECRET}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
     expose:
       - "4002"
     networks:
@@ -56,6 +74,12 @@ services:
     environment:
       - NODE_ENV=production
       - SERVICE_PORT=4003
+      # Supabase Admin Credentials
+      - ADMIN_SUPABASE_URL=${ADMIN_SUPABASE_URL}
+      - ADMIN_SUPABASE_SERVICE_KEY=${ADMIN_SUPABASE_SERVICE_KEY}
+      # Security secrets
+      - JWT_SECRET=${JWT_SECRET}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
     expose:
       - "4003"
     networks:
@@ -69,6 +93,12 @@ services:
     environment:
       - NODE_ENV=production
       - SERVICE_PORT=4004
+      # Supabase Admin Credentials
+      - ADMIN_SUPABASE_URL=${ADMIN_SUPABASE_URL}
+      - ADMIN_SUPABASE_SERVICE_KEY=${ADMIN_SUPABASE_SERVICE_KEY}
+      # Security secrets
+      - JWT_SECRET=${JWT_SECRET}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
     expose:
       - "4004"
     networks:

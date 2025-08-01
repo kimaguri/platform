@@ -1,13 +1,14 @@
+import { secret } from 'encore.dev/config';
 import type { Adapter, AdapterFactory, AdapterConfig } from '../base';
 import { getConnectorType } from '../../lib/utils/connector-helper';
 import { getTenantConfigById } from '../../lib/utils/tenant-config';
-import {
-  getAdminSupabaseUrl,
-  getAdminSupabaseServiceKey,
-} from '../../services/tenant-management/service';
 import createSupabaseAdapter from '../supabase';
 import createPostgresAdapter from '../postgres';
 import createMongoAdapter from '../mongodb';
+import {
+  getAdminSupabaseServiceKey,
+  getAdminSupabaseUrl,
+} from '@services/tenant-management/service';
 
 /**
  * Functional Connector Registry
@@ -78,15 +79,12 @@ export function getAvailableConnectorTypes(): string[] {
 export function getAdminAdapter(table: string): Adapter {
   const cacheKey = `admin:${table}`;
 
+  const adminSupabaseUrl = getAdminSupabaseUrl();
+  const adminSupabaseKey = getAdminSupabaseServiceKey();
+
   if (registryState.cache.has(cacheKey)) {
     return registryState.cache.get(cacheKey)!;
   }
-
-  // Use Encore secrets for admin DB config
-  const adminSupabaseUrl = getAdminSupabaseUrl() || 'https://zshakbdzhwxfxzyqtizl.supabase.co';
-  const adminSupabaseKey =
-    getAdminSupabaseServiceKey() ||
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpzaGFrYmR6aHd4Znh6eXF0aXpsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MzExMzk0OSwiZXhwIjoyMDY4Njg5OTQ5fQ.c67jAz_5TLnq7GY9hega04v1M7Jv0OiTrVfBlPBiEPI';
 
   if (!adminSupabaseUrl || !adminSupabaseKey) {
     throw new Error('Admin Supabase credentials are not configured properly');
