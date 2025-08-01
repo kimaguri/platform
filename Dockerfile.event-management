@@ -16,12 +16,13 @@ RUN pnpm install --frozen-lockfile
 COPY . .
 
 # Install Encore CLI
-RUN curl -L https://encore.dev/install.sh | bash && \
-    export PATH="$PATH:$HOME/.encore/bin" && \
-    echo 'export PATH="$PATH:$HOME/.encore/bin"' >> ~/.bashrc
+RUN curl -L https://encore.dev/install.sh | bash
+
+# Make the startup script executable
+RUN chmod +x /app/start-event-management.sh
 
 # Expose service port
 EXPOSE 4004
 
 # Start the event management service
-CMD ["encore", "run", "--port=4004"]
+CMD ["/app/start-event-management.sh"]

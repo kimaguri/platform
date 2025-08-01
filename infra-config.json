@@ -14,8 +14,6 @@
   },
   "secrets": {
     "ADMIN_SUPABASE_URL": { "$env": "ADMIN_SUPABASE_URL" },
-    "ADMIN_SUPABASE_SERVICE_KEY": { "$env": "ADMIN_SUPABASE_SERVICE_KEY" },
-    "JWT_SECRET": { "$env": "JWT_SECRET" },
-    "ENCRYPTION_KEY": { "$env": "ENCRYPTION_KEY" }
+    "ADMIN_SUPABASE_SERVICE_KEY": { "$env": "ADMIN_SUPABASE_SERVICE_KEY" }
   }
 }
