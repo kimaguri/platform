@@ -15,6 +15,11 @@ RUN pnpm install --frozen-lockfile
 # Copy source code
 COPY . .
 
+# Install Encore CLI
+RUN curl -L https://encore.dev/install.sh | bash && \
+    export PATH="$PATH:$HOME/.encore/bin" && \
+    echo 'export PATH="$PATH:$HOME/.encore/bin"' >> ~/.bashrc
+
 # Expose default port
 EXPOSE 4000
 
