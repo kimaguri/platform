@@ -22,4 +22,4 @@ RUN npm install -g encore.dev
 EXPOSE 4001
 
 # Start the tenant management service
-CMD ["encore", "run", "--port=4001"]
+CMD ["npx", "encore", "run", "--port=4001"]

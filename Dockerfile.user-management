@@ -22,4 +22,4 @@ RUN npm install -g encore.dev
 EXPOSE 4002
 
 # Start the user management service
-CMD ["encore", "run", "--port=4002"]
+CMD ["npx", "encore", "run", "--port=4002"]

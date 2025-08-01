@@ -22,4 +22,4 @@ RUN npm install -g encore.dev
 EXPOSE 4003
 
 # Start the data processing service
-CMD ["encore", "run", "--port=4003"]
+CMD ["npx", "encore", "run", "--port=4003"]

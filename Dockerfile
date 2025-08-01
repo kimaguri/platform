@@ -22,4 +22,4 @@ RUN npm install -g encore.dev
 EXPOSE 4000
 
 # Start the API Gateway
-CMD ["encore", "run", "--port=4000"]
+CMD ["npx", "encore", "run", "--port=4000"]

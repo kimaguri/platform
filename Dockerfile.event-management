@@ -22,4 +22,4 @@ RUN npm install -g encore.dev
 EXPOSE 4004
 
 # Start the event management service
-CMD ["encore", "run", "--port=4004"]
+CMD ["npx", "encore", "run", "--port=4004"]
