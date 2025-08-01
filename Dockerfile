@@ -15,9 +15,6 @@ RUN pnpm install --frozen-lockfile
 # Copy source code
 COPY . .
 
-# Install Encore CLI
-RUN npm install -g encore.dev
-
 # Expose default port
 EXPOSE 4000
 
