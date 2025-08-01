@@ -15,6 +15,9 @@ RUN pnpm install --frozen-lockfile
 # Copy source code
 COPY . .
 
+# Install Encore CLI
+RUN curl -L https://encore.dev/install.sh | bash
+
 # Expose service port
 EXPOSE 4004
 
