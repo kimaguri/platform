@@ -1,5 +1,5 @@
 # Dockerfile for API Gateway
-FROM node:20-alpine
+FROM node:20
 
 WORKDIR /app
 
@@ -19,4 +19,4 @@ COPY . .
 EXPOSE 4000
 
 # Start the API Gateway
-CMD ["npx", "encore", "run", "--port=4000"]
+CMD ["encore", "run", "--port=4000"]

@@ -1,5 +1,5 @@
 # Dockerfile for Tenant Management Service
-FROM node:20-alpine
+FROM node:20
 
 WORKDIR /app
 
@@ -19,4 +19,4 @@ COPY . .
 EXPOSE 4001
 
 # Start the tenant management service
-CMD ["npx", "encore", "run", "--port=4001"]
+CMD ["encore", "run", "--port=4001"]

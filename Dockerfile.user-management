@@ -1,5 +1,5 @@
 # Dockerfile for User Management Service
-FROM node:20-alpine
+FROM node:20
 
 WORKDIR /app
 
@@ -19,4 +19,4 @@ COPY . .
 EXPOSE 4002
 
 # Start the user management service
-CMD ["npx", "encore", "run", "--port=4002"]
+CMD ["encore", "run", "--port=4002"]
