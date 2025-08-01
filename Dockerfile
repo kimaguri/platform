@@ -15,8 +15,11 @@ RUN pnpm install --frozen-lockfile
 # Copy source code
 COPY . .
 
+# Install Encore CLI
+RUN curl -L https://encore.dev/install.sh | bash
+
 # Expose default port
 EXPOSE 4000
 
 # Start the API Gateway
-CMD ["npx", "encore", "run", "--port=4000"]
+CMD ["encore", "run", "--port=4000"]

@@ -15,8 +15,11 @@ RUN pnpm install --frozen-lockfile
 # Copy source code
 COPY . .
 
+# Install Encore CLI
+RUN curl -L https://encore.dev/install.sh | bash
+
 # Expose service port
 EXPOSE 4001
 
 # Start the tenant management service
-CMD ["npx", "encore", "run", "--port=4001"]
+CMD ["encore", "run", "--port=4001"]
