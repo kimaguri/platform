@@ -1,10 +1,11 @@
 # Dockerfile for API Gateway
-FROM node:20
+FROM node:20-slim
 
 WORKDIR /app
 
-# Install pnpm
-RUN corepack enable && corepack prepare pnpm@latest --activate
+# Install curl and pnpm
+RUN apt-get update && apt-get install -y curl && \
+    corepack enable && corepack prepare pnpm@latest --activate
 
 # Copy package files
 COPY package.json pnpm-lock.yaml ./
@@ -17,6 +18,7 @@ COPY . .
 
 # Install Encore CLI
 RUN curl -L https://encore.dev/install.sh | bash
+RUN encore version update
 
 # Make the startup script executable
 RUN chmod +x /app/start-gateway.sh

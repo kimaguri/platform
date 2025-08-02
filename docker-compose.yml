@@ -1,19 +1,16 @@
-version: '3.8'
-
 services:
   # API Gateway - Main entry point
   gateway:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: gateway:latest  # Используем предварительно собранный образ
+    platform: linux/amd64  # Принудительно используем amd64 архитектуру
     ports:
       - '4000:4000'
     environment:
       - NODE_ENV=production
       - PORT=4000
-      - HOST=0.0.0.0
+      - ENCORE_HOST=0.0.0.0
       - LOG_LEVEL=info
-      - CORS_ORIGINS=["http://localhost:3000", "http://localhost:5173"]
+      # Секреты теперь встроены в образ через infra-config.json
       # Service ports for internal communication
       - TENANT_MANAGEMENT_PORT=4001
       - USER_MANAGEMENT_PORT=4002
@@ -21,58 +18,95 @@ services:
       - EVENT_MANAGEMENT_PORT=4004
     networks:
       - simplx-network
+    restart: unless-stopped
+    # depends_on:
+    #   tenant-management:
+    #     condition: service_healthy
+    #   user-management:
+    #     condition: service_healthy
+    #   data-processing:
+    #     condition: service_healthy
+    #   event-management:
+    #     condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s -o /dev/null -w '%{http_code}' http://localhost:4000/ | grep -E '^[2-4][0-9][0-9]$' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
 
   # Tenant Management Service
   tenant-management:
-    build:
-      context: .
-      dockerfile: Dockerfile.tenant-management
-    environment:
-      - NODE_ENV=production
-      - SERVICE_PORT=4001
+    image: tenant-management:latest  # Используем предварительно собранный образ
+    platform: linux/amd64  # Принудительно используем amd64 архитектуру
     expose:
       - '4001'
     networks:
       - simplx-network
+    restart: unless-stopped
+    # healthcheck:
+    #   test: ["CMD-SHELL", "curl -f http://127.0.0.1:4001/_encore/health || exit 1"]
+    #   interval: 30s
+    #   timeout: 10s
+    #   retries: 5
+    #   start_period: 120s
 
   # User Management Service
   user-management:
-    build:
-      context: .
-      dockerfile: Dockerfile.user-management
-    environment:
-      - NODE_ENV=production
-      - SERVICE_PORT=4002
+    image: user-management:latest  # Используем предварительно собранный образ
+    platform: linux/amd64  # Принудительно используем amd64 архитектуру
     expose:
       - '4002'
     networks:
       - simplx-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://127.0.0.1:4002/_encore/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    depends_on:
+      tenant-management:
+        condition: service_started
 
   # Data Processing Service
   data-processing:
-    build:
-      context: .
-      dockerfile: Dockerfile.data-processing
-    environment:
-      - NODE_ENV=production
-      - SERVICE_PORT=4003
+    image: data-processing:latest  # Используем предварительно собранный образ
+    platform: linux/amd64  # Принудительно используем amd64 архитектуру
     expose:
       - '4003'
     networks:
       - simplx-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://127.0.0.1:4003/_encore/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    depends_on:
+      tenant-management:
+        condition: service_started
 
   # Event Management Service
   event-management:
-    build:
-      context: .
-      dockerfile: Dockerfile.event-management
-    environment:
-      - NODE_ENV=production
-      - SERVICE_PORT=4004
+    image: event-management:latest  # Используем предварительно собранный образ
+    platform: linux/amd64  # Принудительно используем amd64 архитектуру
     expose:
       - '4004'
     networks:
       - simplx-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://127.0.0.1:4004/_encore/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    depends_on:
+      tenant-management:
+        condition: service_started
 
 networks:
   simplx-network:

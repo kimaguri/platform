@@ -12,8 +12,46 @@
     "shutdown_hooks": 10,
     "handlers": 20
   },
+  "env": {},
   "secrets": {
-    "ADMIN_SUPABASE_URL": { "$env": "ADMIN_SUPABASE_URL" },
-    "ADMIN_SUPABASE_SERVICE_KEY": { "$env": "ADMIN_SUPABASE_SERVICE_KEY" }
+    "ADMIN_SUPABASE_URL": "https://zshakbdzhwxfxzyqtizl.supabase.co",
+    "ADMIN_SUPABASE_SERVICE_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpzaGFrYmR6aHd4Znh6eXF0aXpsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MzExMzk0OSwiZXhwIjoyMDY4Njg5OTQ5fQ.c67jAz_5TLnq7GY9hega04v1M7Jv0OiTrVfBlPBiEPI"
+  },
+  "pubsub": [
+    {
+      "type": "nsq",
+      "hosts": "127.0.0.1:4150",
+      "topics": {
+        "conversion-events": {
+          "name": "conversion-events"
+        },
+        "rule-management-events": {
+          "name": "rule-management-events"
+        },
+        "conversion-execution-events": {
+          "name": "conversion-execution-events"
+        },
+        "auto-trigger-events": {
+          "name": "auto-trigger-events"
+        }
+      }
+    }
+  ],
+
+
+
+  "service_discovery": {
+    "tenant-management": {
+      "base_url": "http://tenant-management:4001"
+    },
+    "user-management": {
+      "base_url": "http://user-management:4002"
+    },
+    "data-processing": {
+      "base_url": "http://data-processing:4003"
+    },
+    "event-management": {
+      "base_url": "http://event-management:4004"
+    }
   }
 }

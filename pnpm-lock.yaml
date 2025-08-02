@@ -15,8 +15,8 @@ importers:
         specifier: ^17.2.0
         version: 17.2.0
       encore.dev:
-        specifier: ^1.48.10
-        version: 1.48.10
+        specifier: ^1.48.12
+        version: 1.48.12
       mongodb:
         specifier: ^6.3.0
         version: 6.18.0
@@ -407,8 +407,8 @@ packages:
     resolution: {integrity: sha512-Q4sgBT60gzd0BB0lSyYD3xM4YxrXA9y4uBDof1JNYGzOXrQdQ6yX+7XIAqoFOGQFOTK1D3Hts5OllpxMDZFONQ==}
     engines: {node: '>=12'}
 
-  encore.dev@1.48.10:
-    resolution: {integrity: sha512-yrQFRgBK/ABCzLcEuoZpa3X7gdbxB5bKkwaG69eDIhIIgbgrB+9NLXCAmrSwfa/A1hZZeI6DWdIl6XPQYjtBOA==}
+  encore.dev@1.48.12:
+    resolution: {integrity: sha512-9oA52CPrGeI5aFqa7w5DjbF0B8uGFWoBbIm9Tp+hmo+MqgjZiEocb+z+AXZz2Mfvekuj/qClxcwNr4UdlaibJQ==}
     engines: {node: '>=18.0.0'}
 
   esbuild@0.21.5:
@@ -1084,7 +1084,7 @@ snapshots:
 
   dotenv@17.2.0: {}
 
-  encore.dev@1.48.10: {}
+  encore.dev@1.48.12: {}
 
   esbuild@0.21.5:
     optionalDependencies:

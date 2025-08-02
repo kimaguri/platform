@@ -303,6 +303,17 @@ export const searchEntityRecords = api(
     };
   }): Promise<ApiResponse<ContentItem[]>> => {
     const authData = getAuthData() as AuthData;
+    
+    // Debug logging for CORS investigation
+    console.log('searchEntityRecords called with params:', {
+      entity,
+      filters,
+      select,
+      pagination,
+      sort,
+      meta,
+      authData: authData ? 'Present' : 'Missing'
+    });
 
     try {
       // Extract pagination parameters
@@ -346,12 +357,6 @@ export const searchEntityRecords = api(
       return {
         data: entities,
         message: result.message || `Found ${entities.length} ${entity} entities`,
-        meta: {
-          total: total,
-          limit: finalLimit,
-          page: Math.floor(finalOffset / finalLimit) + 1,
-          hasMore: finalOffset + finalLimit < total,
-        },
       };
     } catch (error) {
       throw new Error(

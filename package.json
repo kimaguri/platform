@@ -46,9 +46,9 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.52.0",
     "dotenv": "^17.2.0",
-    "encore.dev": "^1.48.10",
-    "pg": "^8.11.3",
-    "mongodb": "^6.3.0"
+    "encore.dev": "^1.48.12",
+    "mongodb": "^6.3.0",
+    "pg": "^8.11.3"
   },
   "engines": {
     "node": ">=18.0.0"
